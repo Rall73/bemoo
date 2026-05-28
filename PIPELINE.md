@@ -34,11 +34,11 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 
 > Nada vai para usuários reais antes desta fase estar completa.
 
-### 1.1 Correção imediata
+### 1.1 Middleware (concluído)
 
-- [ ] **Renomear `src/proxy.ts` → `src/middleware.ts`**
-  - Next.js só carrega middleware com esse nome exato
-  - Build deve exibir `ƒ Proxy (Middleware)` para confirmar
+- [x] **Arquivo correto: `src/proxy.ts`** — no Next.js 16 o nome obrigatório é `proxy.ts`
+  - Build confirma com `ƒ Proxy (Middleware)` no output
+  - Atenção: versões anteriores usavam `middleware.ts` — Next.js 16 inverteu a convenção
 
 ### 1.2 Autenticação reforçada
 
