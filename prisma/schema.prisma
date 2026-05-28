@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────
+
+enum Plan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum Role {
+  ADMIN
+  GESTOR
+  EXECUTOR
+  AUDITOR
+}
+
+// ─── Core: Empresa e Usuários ─────────────────────────────────────
+
+model Company {
+  id          Int       @id @default(autoincrement())
+  name        String
+  document    String?
+  email       String    @unique
+  plan        Plan      @default(FREE)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  deletedAt   DateTime? @map("deleted_at")
+  suspendedAt DateTime? @map("suspended_at")
+
+  users   User[]
+  modules CompanyModule[]
+
+  @@map("companies")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  companyId     Int       @map("company_id")
+  name          String
+  email         String    @unique
+  password      String
+  role          Role      @default(EXECUTOR)
+  platformAdmin Boolean   @default(false) @map("platform_admin")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  deletedAt     DateTime? @map("deleted_at")
+  deletedBy     Int?      @map("deleted_by")
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@map("users")
+}
+
+// ─── Módulos habilitados por empresa ─────────────────────────────
+
+model CompanyModule {
+  id        Int      @id @default(autoincrement())
+  companyId Int      @map("company_id")
+  module    String   // checklists | intercorrencias | rastreabilidade | planos | captura
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, module])
+  @@index([companyId])
+  @@map("company_modules")
+}

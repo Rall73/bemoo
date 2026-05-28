@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Google Fonts — carregados pelo layout */
+@layer base {
+  :root {
+    --font-manrope: "Manrope", system-ui, sans-serif;
+    --font-inter:   "Inter",   system-ui, sans-serif;
+    --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+    /* Tokens de cor como CSS vars */
+    --color-primary:     #1F4E4A;
+    --color-primary-700: #2A6B65;
+    --color-primary-100: #D6EBE8;
+    --color-accent:      #E07A35;
+    --color-success:     #2F9E64;
+    --color-error:       #C44545;
+    --color-warn:        #D9A23A;
+  }
+
+  html {
+    font-family: var(--font-inter);
+    color: #1A1F23;
+    background-color: #F8F9FB;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Scrollbar sutil */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #8D9298; }
+}
