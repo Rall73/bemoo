@@ -59,6 +59,55 @@ model User {
   @@map("users")
 }
 
+// ─── Auditoria ────────────────────────────────────────────────────
+
+model AuditLog {
+  id            Int       @id @default(autoincrement())
+  companyId     Int       @map("company_id")
+  userId        Int       @map("user_id")
+  action        String
+  entity        String?
+  entityId      Int?      @map("entity_id")
+  payloadBefore String?   @db.Text @map("payload_before")
+  payloadAfter  String?   @db.Text @map("payload_after")
+  ip            String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── Auth: convites e reset de senha ─────────────────────────────
+
+model Invite {
+  id          Int       @id @default(autoincrement())
+  companyId   Int       @map("company_id")
+  email       String
+  role        Role      @default(EXECUTOR)
+  token       String    @unique
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([companyId])
+  @@index([token])
+  @@map("invites")
+}
+
+model PasswordReset {
+  id        Int       @id @default(autoincrement())
+  email     String
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([token])
+  @@map("password_resets")
+}
+
 // ─── Módulos habilitados por empresa ─────────────────────────────
 
 model CompanyModule {
