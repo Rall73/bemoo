@@ -8,6 +8,7 @@ export type AuditAction =
   | "logout"
   // Usuários
   | "usuario.criado"
+  | "usuario.editado"
   | "usuario.desativado"
   | "usuario.role_alterado"
   // Convites

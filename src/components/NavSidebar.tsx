@@ -8,7 +8,7 @@ import { MODULES_CONFIG } from "@/lib/modules"
 import {
   CheckSquare, AlertTriangle, Tag, Target, Inbox,
   LayoutDashboard, LogOut, ChevronRight, Users,
-  Building2, BarChart2, ScrollText,
+  Building2, BarChart2, ScrollText, UserCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -74,7 +74,9 @@ export function NavSidebar({ user, enabledModules }: NavSidebarProps) {
         <p className="px-3 pt-4 pb-1 text-[10px] font-medium uppercase tracking-widest text-gray-400">
           Configurações
         </p>
-        <NavLink href="/configuracoes/usuarios" icon={Users} label="Usuários" current={pathname} />
+        <NavLink href="/configuracoes/usuarios" icon={Users}       label="Usuários"  current={pathname} />
+        <NavLink href="/configuracoes/empresa"  icon={Building2}   label="Empresa"   current={pathname} />
+        <NavLink href="/configuracoes/conta"    icon={UserCircle}  label="Minha conta" current={pathname} />
 
         {/* Admin de plataforma */}
         {user.platformAdmin && (
