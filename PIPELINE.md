@@ -45,10 +45,9 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 
 ### 1.2 Autenticação reforçada
 
-- [ ] **Login com Google (OAuth)** *(configuração no Google Cloud Console pendente)*
-  - Configurar projeto em console.cloud.google.com
-  - Env vars: `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`
-  - Tabela `accounts` para vincular provedor à conta existente
+- [x] **Login com Google (OAuth)** — código completo; credenciais configuradas na Hostinger
+  - Provider Google em auth.ts com criação automática de empresa para novos usuários
+  - Botão "Continuar com Google" nas telas de login e cadastro
   - Fluxo: e-mail já existe → vincula; e-mail novo → cria empresa + usuário
 - [ ] **Bloqueio por tentativas**
   - Tabela `login_attempts (ip, email, attempts, blocked_until)`
@@ -376,20 +375,24 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 ```
 CONCLUÍDO ✅
   1.1  proxy.ts (middleware) ativo
+  1.2  Google OAuth (login + cadastro)
+  1.3  Validação Zod + withAuthCtx + isolamento de tenant
+  1.4  Auditoria (audit_logs + /plataforma/logs)
   2.1  Cadastro self-service
   2.3  Convite de usuários
   2.4  Gestão de usuários (/configuracoes/usuarios)
   2.6  Redefinição de senha
-  3    Painel de plataforma completo (exceto /logs)
+  3    Painel de plataforma completo
   4    E-mail transacional (mailer + 3 templates)
   5.1  /privacidade + /termos + cookie consent
   5.2  Versionamento legal + LegalGate
 
-PRÓXIMO — SEGURANÇA (recomendado antes dos módulos)
-  1.2  Google OAuth
-  1.3  Validação Zod reforçada + isolamento de tenant (assertSameCompany)
-  1.4  Auditoria (audit_logs) → desbloqueia /plataforma/logs
-  1.5  Cloudinary upload
+PRÓXIMO
+  ⚠️  SQL audit_logs no phpMyAdmin (pendente confirmação)
+  1.5  Cloudinary upload (requer conta gratuita)
+  2.2  Wizard onboarding (puro código)
+  2.5  Configurações da empresa + conta (puro código)
+  6.1  Checklists — primeiro módulo
 
 DEPOIS — CONFIGURAÇÕES
   2.2  Wizard onboarding
