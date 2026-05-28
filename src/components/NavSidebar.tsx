@@ -7,8 +7,8 @@ import { BemooLogo } from "@/components/Logo"
 import { MODULES_CONFIG } from "@/lib/modules"
 import {
   CheckSquare, AlertTriangle, Tag, Target, Inbox,
-  LayoutDashboard, LogOut, Settings, ChevronRight, Users,
-  Building2, BarChart2,
+  LayoutDashboard, LogOut, ChevronRight, Users,
+  Building2, BarChart2, ScrollText,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -82,9 +82,10 @@ export function NavSidebar({ user, enabledModules }: NavSidebarProps) {
             <p className="px-3 pt-4 pb-1 text-[10px] font-medium uppercase tracking-widest text-gray-400">
               Plataforma
             </p>
-            <NavLink href="/plataforma/empresas" icon={Building2}  label="Empresas" current={pathname} />
-            <NavLink href="/plataforma/usuarios" icon={Users}      label="Usuários"  current={pathname} />
-            <NavLink href="/plataforma/metricas" icon={BarChart2}  label="Métricas"  current={pathname} />
+            <NavLink href="/plataforma/empresas" icon={Building2}   label="Empresas" current={pathname} />
+            <NavLink href="/plataforma/usuarios" icon={Users}       label="Usuários"  current={pathname} />
+            <NavLink href="/plataforma/metricas" icon={BarChart2}   label="Métricas"  current={pathname} />
+            <NavLink href="/plataforma/logs"     icon={ScrollText}  label="Logs"      current={pathname} />
           </>
         )}
       </nav>

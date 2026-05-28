@@ -2,6 +2,7 @@ import { z } from "zod"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { ok, badRequest, unauthorized, notFound } from "@/lib/api"
+import { logAction, getIp } from "@/lib/audit"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -79,6 +80,15 @@ export async function PATCH(req: Request, { params }: Ctx) {
   } else {
     await prisma.companyModule.deleteMany({ where: { companyId, module } })
   }
+
+  await logAction({
+    companyId: companyId,
+    userId:    parseInt(admin.user.id),
+    action:    enabled ? "modulo.habilitado" : "modulo.desabilitado",
+    entity:    "module",
+    after:     { module, enabled },
+    ip:        getIp(req),
+  })
 
   return ok({ module, enabled })
 }

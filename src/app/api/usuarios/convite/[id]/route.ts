@@ -1,73 +1,72 @@
 import crypto from "crypto"
-import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { ok, noContent, badRequest, unauthorized, forbidden, notFound } from "@/lib/api"
+import { withAuthCtx, ok, noContent, badRequest, forbidden, notFound } from "@/lib/api"
+import { logAction, getIp } from "@/lib/audit"
 import { sendMail } from "@/lib/mailer"
 import { emailConvite } from "@/emails/convite"
 
-type Ctx = { params: Promise<{ id: string }> }
-
-async function getSession() {
-  return auth() as Promise<{
-    user: { id: string; name?: string | null; email?: string | null; role: string; companyId: number }
-  } | null>
-}
+type P = { id: string }
 
 /**
  * DELETE /api/usuarios/convite/[id]
  * Cancela (exclui) um convite pendente (ADMIN only).
  */
-export async function DELETE(_req: Request, { params }: Ctx) {
-  const session = await getSession()
-  if (!session?.user) return unauthorized()
-  if (session.user.role !== "ADMIN") return forbidden("Apenas administradores podem cancelar convites.")
+export const DELETE = withAuthCtx<P>(async (req, session, params) => {
+  if (session.user.role !== "ADMIN") {
+    return forbidden("Apenas administradores podem cancelar convites.")
+  }
 
-  const { id } = await params
-  const inviteId = parseInt(id)
+  const inviteId = parseInt(params.id)
   if (isNaN(inviteId)) return badRequest("ID inválido.")
 
   const invite = await prisma.invite.findFirst({
-    where: { id: inviteId, companyId: session.user.companyId },
-    select: { id: true, acceptedAt: true },
+    where:  { id: inviteId, companyId: session.user.companyId },
+    select: { id: true, email: true, acceptedAt: true },
   })
   if (!invite) return notFound("Convite não encontrado.")
   if (invite.acceptedAt) return badRequest("Convite já aceito — não é possível cancelar.")
 
   await prisma.invite.delete({ where: { id: inviteId } })
+
+  await logAction({
+    companyId: session.user.companyId,
+    userId:    parseInt(session.user.id),
+    action:    "convite.cancelado",
+    entity:    "invite",
+    entityId:  inviteId,
+    before:    { email: invite.email },
+    ip:        getIp(req),
+  })
+
   return noContent()
-}
+})
 
 /**
  * POST /api/usuarios/convite/[id]
  * Reenvia o e-mail de um convite (gera novo token, reinicia prazo) (ADMIN only).
  */
-export async function POST(_req: Request, { params }: Ctx) {
-  const session = await getSession()
-  if (!session?.user) return unauthorized()
-  if (session.user.role !== "ADMIN") return forbidden("Apenas administradores podem reenviar convites.")
+export const POST = withAuthCtx<P>(async (req, session, params) => {
+  if (session.user.role !== "ADMIN") {
+    return forbidden("Apenas administradores podem reenviar convites.")
+  }
 
-  const { id } = await params
-  const inviteId = parseInt(id)
+  const inviteId = parseInt(params.id)
   if (isNaN(inviteId)) return badRequest("ID inválido.")
 
   const invite = await prisma.invite.findFirst({
-    where: { id: inviteId, companyId: session.user.companyId },
+    where:  { id: inviteId, companyId: session.user.companyId },
     select: { id: true, email: true, role: true, acceptedAt: true },
   })
   if (!invite) return notFound("Convite não encontrado.")
   if (invite.acceptedAt) return badRequest("Convite já aceito.")
 
-  // Novo token + novo prazo
   const token     = crypto.randomBytes(32).toString("hex")
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000)
 
-  await prisma.invite.update({
-    where: { id: inviteId },
-    data:  { token, expiresAt },
-  })
+  await prisma.invite.update({ where: { id: inviteId }, data: { token, expiresAt } })
 
   const company = await prisma.company.findUnique({
-    where: { id: session.user.companyId },
+    where:  { id: session.user.companyId },
     select: { name: true },
   })
 
@@ -81,5 +80,15 @@ export async function POST(_req: Request, { params }: Ctx) {
     }),
   }).catch((err) => console.error("[Mailer] Falha ao reenviar convite:", err))
 
+  await logAction({
+    companyId: session.user.companyId,
+    userId:    parseInt(session.user.id),
+    action:    "convite.reenviado",
+    entity:    "invite",
+    entityId:  inviteId,
+    after:     { email: invite.email },
+    ip:        getIp(req),
+  })
+
   return ok({ message: "Convite reenviado." })
-}
+})

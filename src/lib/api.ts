@@ -164,6 +164,38 @@ export function withAuth(
 }
 
 /**
+ * Wrapper para rotas autenticadas com params dinâmicos (ex: /api/usuarios/[id]).
+ *
+ * Uso:
+ *   export const PATCH = withAuthCtx<{ id: string }>(async (req, session, params) => {
+ *     const userId = parseInt(params.id)
+ *     ...
+ *   })
+ */
+export function withAuthCtx<P extends Record<string, string>>(
+  handler: (req: Request, session: AuthenticatedSession, params: P) => Promise<NextResponse>,
+  minRole?: "ADMIN" | "GESTOR" | "EXECUTOR" | "AUDITOR"
+) {
+  return async (req: Request, { params }: { params: Promise<P> }): Promise<NextResponse> => {
+    const session = await auth() as AuthenticatedSession | null
+
+    if (!session?.user) return unauthorized()
+
+    if (minRole) {
+      const roleError = assertMinRole(session.user.role, minRole)
+      if (roleError) return roleError
+    }
+
+    try {
+      return await handler(req, session, await params)
+    } catch (err) {
+      console.error("[API Error]", err)
+      return serverError()
+    }
+  }
+}
+
+/**
  * Wrapper exclusivo para platform admins.
  */
 export function withPlatformAdmin(

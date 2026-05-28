@@ -40,8 +40,9 @@ model Company {
   deletedAt   DateTime? @map("deleted_at")
   suspendedAt DateTime? @map("suspended_at")
 
-  users   User[]
-  modules CompanyModule[]
+  users     User[]
+  modules   CompanyModule[]
+  auditLogs AuditLog[]
 
   @@map("companies")
 }
@@ -60,6 +61,7 @@ model User {
 
   company          Company           @relation(fields: [companyId], references: [id])
   legalAcceptances LegalAcceptance[]
+  auditLogs        AuditLog[]
 
   @@index([companyId])
   @@map("users")
@@ -71,13 +73,16 @@ model AuditLog {
   id            Int       @id @default(autoincrement())
   companyId     Int       @map("company_id")
   userId        Int       @map("user_id")
-  action        String
-  entity        String?
+  action        String    @db.VarChar(100)
+  entity        String?   @db.VarChar(100)
   entityId      Int?      @map("entity_id")
   payloadBefore String?   @db.Text @map("payload_before")
   payloadAfter  String?   @db.Text @map("payload_after")
-  ip            String?
+  ip            String?   @db.VarChar(45)
   createdAt     DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    User    @relation(fields: [userId],    references: [id])
 
   @@index([companyId])
   @@index([userId])

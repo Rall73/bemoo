@@ -1,6 +1,7 @@
 import crypto from "crypto"
 import { prisma } from "@/lib/prisma"
 import { withAuth, validateBody, ok, badRequest, forbidden } from "@/lib/api"
+import { logAction, getIp } from "@/lib/audit"
 import { zConviteSchema } from "@/lib/validators"
 import { sendMail } from "@/lib/mailer"
 import { emailConvite } from "@/emails/convite"
@@ -61,6 +62,15 @@ export const POST = withAuth(async (req, session) => {
       token,
     }),
   }).catch((err) => console.error("[Mailer] Falha ao enviar convite:", err))
+
+  await logAction({
+    companyId: companyId,
+    userId:    parseInt(session.user.id),
+    action:    "convite.enviado",
+    entity:    "invite",
+    after:     { email, role },
+    ip:        getIp(req),
+  })
 
   return ok({ message: "Convite enviado." })
 })
