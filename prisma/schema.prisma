@@ -9,6 +9,11 @@ datasource db {
 
 // ─── Enums ────────────────────────────────────────────────────────
 
+enum LegalType {
+  TERMS
+  PRIVACY
+}
+
 enum Plan {
   FREE
   STARTER
@@ -53,7 +58,8 @@ model User {
   deletedAt     DateTime? @map("deleted_at")
   deletedBy     Int?      @map("deleted_by")
 
-  company Company @relation(fields: [companyId], references: [id])
+  company          Company           @relation(fields: [companyId], references: [id])
+  legalAcceptances LegalAcceptance[]
 
   @@index([companyId])
   @@map("users")
@@ -106,6 +112,37 @@ model PasswordReset {
 
   @@index([token])
   @@map("password_resets")
+}
+
+// ─── Documentos legais e aceites ─────────────────────────────────
+
+model LegalVersion {
+  id          Int               @id @default(autoincrement())
+  type        LegalType
+  version     String            @db.VarChar(20)
+  summary     String?           @db.Text
+  effectiveAt DateTime          @map("effective_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  createdBy   Int               @map("created_by")
+  acceptances LegalAcceptance[]
+
+  @@unique([type, version])
+  @@index([type, effectiveAt])
+  @@map("legal_versions")
+}
+
+model LegalAcceptance {
+  id             Int          @id @default(autoincrement())
+  userId         Int          @map("user_id")
+  legalVersionId Int          @map("legal_version_id")
+  acceptedAt     DateTime     @default(now()) @map("accepted_at")
+  ip             String?      @db.VarChar(45)
+  user           User         @relation(fields: [userId], references: [id])
+  legalVersion   LegalVersion @relation(fields: [legalVersionId], references: [id])
+
+  @@unique([userId, legalVersionId])
+  @@index([userId])
+  @@map("legal_acceptances")
 }
 
 // ─── Módulos habilitados por empresa ─────────────────────────────

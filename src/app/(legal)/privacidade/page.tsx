@@ -5,8 +5,9 @@ export const metadata: Metadata = {
   description: "Como o bemoo coleta, usa e protege seus dados pessoais.",
 }
 
+const VERSION           = "1.0"
 const ULTIMA_ATUALIZACAO = "28 de maio de 2026"
-const CONTATO_DPO = "privacidade@bemoo.net"
+const CONTATO_DPO        = "privacidade@bemoo.net"
 
 export default function PrivacidadePage() {
   return (
@@ -14,7 +15,10 @@ export default function PrivacidadePage() {
       <h1 className="text-3xl font-semibold text-gray-900 mb-2" style={{ letterSpacing: "-0.02em" }}>
         Política de Privacidade
       </h1>
-      <p className="text-sm text-gray-400 mb-10">Última atualização: {ULTIMA_ATUALIZACAO}</p>
+      <p className="text-sm text-gray-400 mb-10 flex items-center gap-2">
+        <span className="font-mono bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5 rounded">v{VERSION}</span>
+        Última atualização: {ULTIMA_ATUALIZACAO}
+      </p>
 
       <Section title="1. Quem somos">
         <p>

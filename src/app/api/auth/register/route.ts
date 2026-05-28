@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma"
-import { validateBody, created, badRequest, serverError } from "@/lib/api"
+import { validateBody, created, badRequest } from "@/lib/api"
 import { zCadastroSchema } from "@/lib/validators"
 import { sendMail } from "@/lib/mailer"
 import { emailBoasVindas } from "@/emails/boas-vindas"
+import { getActiveVersions, recordAcceptances, getClientIp } from "@/lib/legal"
 import bcrypt from "bcryptjs"
 
 export async function POST(req: Request) {
@@ -47,6 +48,20 @@ export async function POST(req: Request) {
       },
     })
   })
+
+  // Registrar aceite dos documentos legais vigentes
+  // (usuário marcou o checkbox "Li e aceito os Termos e a Política de Privacidade")
+  try {
+    const active     = await getActiveVersions()
+    const versionIds = [active.TERMS?.id, active.PRIVACY?.id].filter(
+      (id): id is number => id != null
+    )
+    const ip = getClientIp(req)
+    await recordAcceptances(user.id, versionIds, ip)
+  } catch (err) {
+    // Não bloqueia o cadastro — será solicitado na próxima entrada se falhar
+    console.error("[Legal] Falha ao registrar aceite no cadastro:", err)
+  }
 
   // Enviar boas-vindas (sem bloquear a resposta)
   sendMail({

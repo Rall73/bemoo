@@ -2,6 +2,8 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { NavSidebar } from "@/components/NavSidebar"
+import { getPendingVersions } from "@/lib/legal"
+import { LegalGate } from "./_components/LegalGate"
 
 export default async function AppLayout({
   children,
@@ -10,6 +12,14 @@ export default async function AppLayout({
 }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
+
+  const userId = parseInt(session.user.id)
+
+  // Verificar documentos legais pendentes de aceite
+  const pendingVersions = await getPendingVersions(userId)
+  if (pendingVersions.length > 0) {
+    return <LegalGate versions={pendingVersions} />
+  }
 
   // Busca módulos habilitados para a empresa
   const companyModules = await prisma.companyModule.findMany({
