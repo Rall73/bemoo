@@ -2,6 +2,9 @@
 
 > Documento vivo. Atualizar a cada sprint concluída.
 > Última revisão: 2026-05-28
+>
+> Documentação operacional separada:
+> - **[LEGAL-VERSIONING.md](./LEGAL-VERSIONING.md)** — como publicar novas versões de Termos e Política
 
 ---
 
@@ -186,18 +189,31 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 
 > Deve estar no ar antes de qualquer divulgação pública.
 
-### 5.1 Páginas obrigatórias
+### 5.1 Páginas obrigatórias (concluída)
 
-- [ ] `/privacidade` — Política de Privacidade (LGPD):
+- [x] `/privacidade` — Política de Privacidade (LGPD):
   - Quais dados coletamos e por quê
-  - Base legal de cada tratamento
-  - Tempo de retenção
-  - Direitos do titular: acesso, correção, exclusão, portabilidade
-  - Contato do encarregado (DPO)
-- [ ] `/termos` — Termos de Uso
-- [ ] Cookie consent — banner na primeira visita; armazenar aceite
+  - Base legal de cada tratamento (tabela)
+  - Tempo de retenção por categoria (tabela)
+  - Direitos do titular: acesso, correção, exclusão, portabilidade (art. 18 LGPD)
+  - Contato do encarregado (DPO): privacidade@bemoo.net
+- [x] `/termos` — Termos de Uso (12 seções, lei brasileira)
+- [x] Cookie consent — banner na primeira visita; aceite em `localStorage`
 
-### 5.2 Direitos do titular (LGPD)
+### 5.2 Versionamento de documentos legais (concluída)
+
+> Documentação completa: [LEGAL-VERSIONING.md](./LEGAL-VERSIONING.md)
+
+- [x] Tabela `legal_versions` — versões publicadas (type, versão, resumo, vigência)
+- [x] Tabela `legal_acceptances` — registro imutável de cada aceite (userId, versionId, timestamp, IP)
+- [x] `LegalGate` — bloqueio suave no app: exibe tela de aceite se houver versão pendente
+- [x] `POST /api/legal/accept` — grava aceite(s) com validação de IDs ativos
+- [x] `POST /api/legal/versions` — publica nova versão (platform admin)
+- [x] `GET /api/legal/versions` — retorna versões ativas
+- [x] Cadastro grava aceite das versões ativas no momento do registro
+- [x] Badge de versão nas páginas `/termos` e `/privacidade`
+
+### 5.3 Direitos do titular (LGPD)
 
 - [ ] `/configuracoes/meus-dados` — exportar dados pessoais em JSON
 - [ ] Solicitação de exclusão: soft delete + anonimização após 30 dias
