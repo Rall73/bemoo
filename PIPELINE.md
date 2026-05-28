@@ -1,7 +1,7 @@
 # bemoo — Pipeline de Desenvolvimento
 
 > Documento vivo. Atualizar a cada sprint concluída.
-> Última revisão: 2026-05-28 (atualizado pós Fase 3)
+> Última revisão: 2026-05-28
 >
 > Documentação operacional separada:
 > - **[LEGAL-VERSIONING.md](./LEGAL-VERSIONING.md)** — como publicar novas versões de Termos e Política
@@ -11,422 +11,307 @@
 ## Visão geral
 
 O bemoo é uma plataforma SaaS multi-módulo para gestão operacional de empresas.
-A base técnica está pronta (Next.js 16 + Prisma + Auth.js + MySQL na Hostinger).
-Este documento organiza tudo o que precisa ser construído, na ordem certa.
+Stack: Next.js 16 + Prisma 6 + Auth.js v5 + MySQL + Tailwind 3.
+Deploy: Hostinger Node.js gerenciado — `git push origin main` = rebuild automático.
 
 **Princípio:** segurança e estrutura primeiro — funcionalidade depois.
 Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 
 ---
 
-## Fase 0 — Fundação (concluída)
+## Fase 0 — Fundação ✅
 
-- [x] Projeto Next.js 16 + Prisma + Auth.js v5
+- [x] Projeto Next.js 16 + Prisma 6 + Auth.js v5
 - [x] Deploy na Hostinger (bemoo.net)
-- [x] Banco MySQL + tabelas base (companies, users, company_modules)
-- [x] Login por credenciais
-- [x] Sistema de módulos por empresa (company_modules)
-- [x] Identidade visual: Paleta A, Logo "Olho atento", componentes UI
-- [x] Landing page
+- [x] Banco MySQL + tabelas base (`companies`, `users`, `company_modules`)
+- [x] Login por credenciais (e-mail + senha)
+- [x] Sistema de módulos por empresa (`company_modules`)
+- [x] Identidade visual: Paleta verde-petróleo, Logo "Olho atento", componentes UI base
+- [x] Landing page (`/`)
 - [x] Dashboard base com módulos dinâmicos
-- [x] AGENTS.md + CLAUDE.md + PIPELINE.md
+- [x] `AGENTS.md` + `CLAUDE.md` + `PIPELINE.md`
 
 ---
 
 ## Fase 1 — Segurança e Infraestrutura
 
-> Nada vai para usuários reais antes desta fase estar completa.
+### 1.1 Middleware ✅
+- [x] `src/proxy.ts` — nome correto no Next.js 16 (build confirma `ƒ Proxy (Middleware)`)
 
-### 1.1 Middleware (concluído)
+### 1.2 Autenticação ✅
+- [x] Login com Google OAuth — provider em `auth.ts`, botão nas telas de login e cadastro
+  - Fluxo: e-mail já existe → vincula; e-mail novo → cria empresa + usuário automaticamente
+  - Credenciais `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` configuradas na Hostinger
+  - App publicado no Google Cloud Console (não em modo teste)
+- [x] Redefinição de senha — token 1h, uso único, tabela `password_resets`
+- [ ] Bloqueio por tentativas — tabela `login_attempts`, 5 falhas → 15 min bloqueado
+- [ ] Logout global — campo `tokenVersion` em users; incrementar invalida todos os JWTs
 
-- [x] **Arquivo correto: `src/proxy.ts`** — no Next.js 16 o nome obrigatório é `proxy.ts`
-  - Build confirma com `ƒ Proxy (Middleware)` no output
-  - Atenção: versões anteriores usavam `middleware.ts` — Next.js 16 inverteu a convenção
+### 1.3 Proteção de rotas e APIs ✅ (parcial)
+- [x] `validateBody(req, schema)` — helper Zod em `src/lib/api.ts`; usado em todas as rotas com body
+- [x] `withAuth(handler, minRole?)` — wrapper para rotas simples; injeta sessão, trata erros
+- [x] `withAuthCtx<P>(handler, minRole?)` — wrapper para rotas dinâmicas com `params`
+- [x] `assertSameCompany(sessionCompanyId, resourceCompanyId)` — retorna 403 se divergir
+- [x] `assertMinRole(userRole, minRole)` — hierarquia ADMIN > GESTOR > EXECUTOR > AUDITOR
+- [x] Isolamento de tenant em todas as rotas: queries sempre filtradas por `companyId` da sessão
+- [ ] Rate limiting global — Upstash Redis + `@upstash/ratelimit` (máx 100 req/min por IP)
+- [ ] Headers de segurança em `next.config.mjs` (`X-Frame-Options`, `X-Content-Type-Options`, etc.)
 
-### 1.2 Autenticação reforçada
-
-- [x] **Login com Google (OAuth)** — código completo; credenciais configuradas na Hostinger
-  - Provider Google em auth.ts com criação automática de empresa para novos usuários
-  - Botão "Continuar com Google" nas telas de login e cadastro
-  - Fluxo: e-mail já existe → vincula; e-mail novo → cria empresa + usuário
-- [ ] **Bloqueio por tentativas**
-  - Tabela `login_attempts (ip, email, attempts, blocked_until)`
-  - Após 5 falhas: bloquear por 15 min
-  - Middleware de rate limit na rota `/api/auth/callback/credentials`
-- [ ] **Expiração de sessão** — JWT expira em 8h; renovação silenciosa
-- [ ] **Logout global** — campo `tokenVersion INT` na tabela users;
-  incrementar invalida todos os tokens ativos daquele usuário
-
-### 1.3 Proteção de rotas e APIs
-
-- [ ] **Rate limiting global** — máx 100 req/min por IP em rotas `/api/`
-  - Solução recomendada: Upstash Redis + `@upstash/ratelimit` (free tier)
-- [ ] **Headers de segurança** — adicionar em `next.config.mjs`:
-  ```
-  X-Frame-Options: DENY
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=()
-  ```
-- [ ] **Validação de entrada com Zod** — em todos os endpoints de API
-  - Nunca confiar em dados do client; validar schema antes de qualquer query Prisma
-- [ ] **Isolamento de tenant** — helper `assertSameCompany(session, resourceCompanyId)`
-  - Lança 403 se o recurso não pertencer à empresa da sessão
-  - Aplicar em TODAS as rotas que acessam dados
-
-### 1.4 Auditoria
-
-- [ ] Tabela `audit_logs`:
-  ```sql
-  id, company_id, user_id, action, entity, entity_id,
-  payload_before JSON, payload_after JSON, ip, created_at
-  ```
-- [ ] Registrar: login, logout, criação, edição, exclusão, convite, alteração de role
-- [ ] Helper `src/lib/audit.ts` — `logAction({ session, action, entity, ... })`
+### 1.4 Auditoria ✅
+- [x] Modelo `AuditLog` no schema Prisma com relações para `Company` e `User`
+- [x] `src/lib/audit.ts` — `logAction()` (nunca lança) + `getIp()` + tipo `AuditAction`
+- [x] Log plugado em: role change, desativar usuário, convites, empresa editar/suspender/reativar, módulo habilitar/desabilitar, configurações de empresa e conta
+- [x] `/plataforma/logs` — tabela paginada com filtros por empresa e ação
+- ⚠️ **SQL pendente:** tabela `audit_logs` precisa ser criada no phpMyAdmin (SQL abaixo)
 
 ### 1.5 Upload de arquivos (Cloudinary)
-
+- [ ] Conta gratuita em cloudinary.com
 - [ ] Env vars: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
-- [ ] Rota `POST /api/upload`:
-  - Autenticação obrigatória
-  - Tipos permitidos: jpg, png, pdf, xlsx (lista branca)
-  - Limite: 10 MB por arquivo
-  - Pasta por empresa: `bemoo/{companyId}/`
+- [ ] Rota `POST /api/upload` — autenticada, lista branca de tipos, max 10 MB, pasta por empresa
 - [ ] Nunca expor API key no client — upload sempre server-side
 
 ---
 
 ## Fase 2 — Onboarding e Gestão de Conta
 
-### 2.1 Cadastro self-service (concluído)
+### 2.1 Cadastro self-service ✅
+- [x] Página `/cadastro` — nome da empresa, e-mail, senha, aceite dos termos
+- [x] Cria `Company` (plano FREE) + `User` (role ADMIN) em `$transaction`
+- [x] Grava aceite das versões legais ativas no registro
+- [x] Envia e-mail de boas-vindas
 
-- [x] Página `/cadastro`:
-  - Campos: nome da empresa, e-mail, senha, aceite dos termos (obrigatório)
-  - Validação: e-mail único, senha mínimo 8 chars com número
-  - Cria Company (plano FREE) + User (role ADMIN)
-  - Envia e-mail de boas-vindas
-  - Grava aceite das versões legais ativas
+### 2.2 Wizard de onboarding — pendente
+- [ ] Campo `onboarding_completed_at DATETIME` na tabela `companies`
+- [ ] Passo 1 — Perfil da empresa (segmento, tamanho)
+- [ ] Passo 2 — Escolha de módulos (FREE = 1 módulo)
+- [ ] Passo 3 — Convidar time (opcional, pode pular)
+- [ ] Passo 4 — Tela de conclusão com acesso ao dashboard
 
-### 2.2 Wizard de onboarding (pós-cadastro) — pendente
+### 2.3 Convite de usuários ✅
+- [x] Tabela `invites` — token hex 32 bytes, expira em 48h, uso único
+- [x] Página pública `/aceitar-convite?token=xxx` com formulário de nome + senha
+- [x] `POST /api/aceitar-convite` — cria usuário + marca invite + grava aceite legal em `$transaction`
+- [x] Reenvio de convite gera novo token + novo prazo (48h)
 
-- [ ] Campo `onboarding_completed_at DATETIME` na tabela companies
-- [ ] Passo 1 — Perfil: nome fantasia, segmento, tamanho da empresa
-- [ ] Passo 2 — Módulos: quais deseja experimentar (FREE = 1 módulo)
-- [ ] Passo 3 — Time: convidar colaboradores por e-mail (opcional, pode pular)
-- [ ] Passo 4 — Concluído: tela de celebração + acesso ao dashboard
+### 2.4 Gestão de usuários ✅
+- [x] `/configuracoes/usuarios` — listar membros ativos e convites pendentes
+- [x] Convidar com role; cancelar/reenviar convite; alterar role; desativar com soft delete
+- [x] Guards: não pode desativar a si mesmo; deve restar ≥ 1 ADMIN ativo
 
-### 2.3 Convite de usuários (concluído)
+### 2.5 Configurações ✅
+- [x] `/configuracoes/empresa` — editar nome, CNPJ, e-mail de contato (ADMIN only) com badge de plano
+- [x] `/configuracoes/conta` — editar nome de exibição; alterar senha com verificação da atual; badge Google para usuários sem senha
+- [ ] `/configuracoes/modulos` — ver módulos ativos da empresa (informativo)
+- [ ] `/configuracoes/meus-dados` — exportar dados pessoais (LGPD 5.3)
 
-- [x] Tabela `invites (id, company_id, email, role, token, expires_at, accepted_at)`
-- [x] Fluxo: ADMIN convida → e-mail com link tokenizado → convidado define senha
-- [x] Token expira em 48h; reenvio disponível; uso único
-- [x] Página pública `/aceitar-convite?token=xxx` com formulário de senha
-- [x] `POST /api/aceitar-convite` — cria user + marca invite + grava aceite legal
-
-### 2.4 Gestão de usuários (concluído)
-
-- [x] `/configuracoes/usuarios` — listar, convidar, editar role, desativar
-- [x] Papéis de acesso:
-
-  | Role | O que pode fazer |
-  |---|---|
-  | ADMIN | Tudo: configurações, usuários, módulos |
-  | GESTOR | Criar/editar registros; ver relatórios |
-  | EXECUTOR | Criar/editar próprios registros |
-  | AUDITOR | Somente leitura em tudo |
-
-- [x] APIs: `PATCH /api/usuarios/[id]` (role), `DELETE /api/usuarios/[id]` (desativar)
-- [x] APIs: `POST/DELETE/PATCH /api/usuarios/convite` e `/api/usuarios/convite/[id]`
-
-### 2.5 Configurações da empresa
-
-- [ ] `/configuracoes/empresa` — nome, logo, CNPJ, e-mail de contato
-- [ ] `/configuracoes/conta` — trocar senha, vincular Google, foto de perfil
-- [ ] `/configuracoes/modulos` — ver módulos ativos (admin de plataforma ativa/desativa)
-
-### 2.6 Redefinição de senha (concluído)
-
-- [x] Tabela `password_resets (email, token, expires_at, used_at)`
-- [x] Página `/redefinir-senha` com formulário de e-mail
-- [x] Página `/redefinir-senha?token=xxx` para nova senha
-- [x] Token expira em 1h; uso único
+### 2.6 Redefinição de senha ✅
+- [x] Tabela `password_resets` — token 1h, uso único
+- [x] `/redefinir-senha` — formulário de e-mail → envia link
+- [x] `/redefinir-senha?token=xxx` — formulário de nova senha
 
 ---
 
-## Fase 3 — Painel de Plataforma (super admin) (concluído)
+## Fase 3 — Painel de Plataforma (super admin) ✅
 
-> Grupo de rota `(plataforma)`, protegido por `platformAdmin = true` no layout.
-> Nunca depender só de ocultar o link — verificar no servidor.
+> Guard em `(app)/plataforma/layout.tsx` verifica `platformAdmin` server-side.
 
-- [x] `/plataforma/empresas` — listar, buscar, filtrar por plano/status
-- [x] `/plataforma/empresas/[id]` — detalhes, editar dados, suspender/reativar
-- [x] `/plataforma/empresas/[id]/modulos` — toggles de módulos com switch animado
-- [x] `/plataforma/empresas/nova` — criar empresa manualmente (vendas diretas)
-- [x] `/plataforma/usuarios` — todos os usuários da plataforma
-- [ ] `/plataforma/logs` — audit_logs paginado com filtros *(depende da Fase 1.4)*
-- [x] `/plataforma/metricas` — empresas ativas, usuários, módulos mais usados
+- [x] `/plataforma/empresas` — listagem com busca + filtros por plano/status + toggle de suspensão inline
+- [x] `/plataforma/empresas/nova` — criar empresa + admin + módulos iniciais + envia e-mail de reset
+- [x] `/plataforma/empresas/[id]` — editar dados, suspender/reativar, lista de usuários
+- [x] `/plataforma/empresas/[id]/modulos` — toggles individuais por módulo com switch animado
+- [x] `/plataforma/usuarios` — todos os usuários de todas as empresas
+- [x] `/plataforma/metricas` — totais, distribuição por plano, módulos mais usados
+- [x] `/plataforma/logs` — audit logs paginados com filtros por empresa e ação
 
 ---
 
-## Fase 4 — E-mail Transacional (concluído)
+## Fase 4 — E-mail Transacional ✅
 
-> Nodemailer + SMTP Hostinger. Senha do mailbox: apenas alphanum + `_` (sem `#@!$`).
+> Nodemailer + SMTP Hostinger. `noreply@bemoo.net` configurado.
+> Transporter criado dentro da função (nunca singleton). `tls: { rejectUnauthorized: false }`.
 
-- [x] Caixa `noreply@bemoo.net` no painel Hostinger
-- [x] `src/lib/mailer.ts` — `sendMail({ to, subject, html, text })`
-  - Transporter criado dentro da função (nunca singleton)
-  - `tls: { rejectUnauthorized: false }`
-- [x] Templates em `src/emails/`:
-
-  | Template | Disparado quando | Status |
-  |---|---|---|
-  | `boas-vindas` | Cadastro concluído | ✅ |
-  | `convite` | ADMIN convida colaborador | ✅ |
-  | `redefinir-senha` | Solicitação de reset / nova empresa | ✅ |
-  | `notificacao-intercorrencia` | Intercorrência aberta | ⏳ Fase 6.2 |
-  | `checklist-atrasado` | Checklist não executado no prazo | ⏳ Fase 9 |
-  | `acao-vencida` | Ação de plano com prazo ultrapassado | ⏳ Fase 9 |
+| Template | Disparado quando | Status |
+|---|---|---|
+| `boas-vindas` | Cadastro self-service concluído | ✅ |
+| `convite` | ADMIN convida colaborador | ✅ |
+| `redefinir-senha` | Reset de senha / nova empresa pelo admin | ✅ |
+| `notificacao-intercorrencia` | Intercorrência aberta | ⏳ Fase 6.2 |
+| `checklist-atrasado` | Checklist não executado no prazo | ⏳ Fase 9 |
+| `acao-vencida` | Ação de plano com prazo ultrapassado | ⏳ Fase 9 |
 
 ---
 
 ## Fase 5 — Compliance e Legal
 
-> Deve estar no ar antes de qualquer divulgação pública.
-
-### 5.1 Páginas obrigatórias (concluída)
-
-- [x] `/privacidade` — Política de Privacidade (LGPD):
-  - Quais dados coletamos e por quê
-  - Base legal de cada tratamento (tabela)
-  - Tempo de retenção por categoria (tabela)
-  - Direitos do titular: acesso, correção, exclusão, portabilidade (art. 18 LGPD)
-  - Contato do encarregado (DPO): privacidade@bemoo.net
+### 5.1 Páginas obrigatórias ✅
+- [x] `/privacidade` — Política de Privacidade LGPD (bases legais, retenção, direitos do titular)
 - [x] `/termos` — Termos de Uso (12 seções, lei brasileira)
 - [x] Cookie consent — banner na primeira visita; aceite em `localStorage`
 
-### 5.2 Versionamento de documentos legais (concluída)
+### 5.2 Versionamento de documentos legais ✅
 
 > Documentação completa: [LEGAL-VERSIONING.md](./LEGAL-VERSIONING.md)
 
-- [x] Tabela `legal_versions` — versões publicadas (type, versão, resumo, vigência)
-- [x] Tabela `legal_acceptances` — registro imutável de cada aceite (userId, versionId, timestamp, IP)
-- [x] `LegalGate` — bloqueio suave no app: exibe tela de aceite se houver versão pendente
-- [x] `POST /api/legal/accept` — grava aceite(s) com validação de IDs ativos
-- [x] `POST /api/legal/versions` — publica nova versão (platform admin)
-- [x] `GET /api/legal/versions` — retorna versões ativas
-- [x] Cadastro grava aceite das versões ativas no momento do registro
-- [x] Badge de versão nas páginas `/termos` e `/privacidade`
+- [x] `legal_versions` — versões publicadas com data de vigência
+- [x] `legal_acceptances` — registro imutável por usuário (userId + versionId + IP + timestamp)
+- [x] `LegalGate` — bloqueia o app até o usuário aceitar versões pendentes
+- [x] `POST /api/legal/accept` — valida IDs contra versões ativas antes de gravar
+- [x] `POST /api/legal/versions` — publica nova versão (platform admin only)
+- [x] Cadastro e convite aceitam automaticamente versões ativas no momento
 
-### 5.3 Direitos do titular (LGPD)
-
+### 5.3 Direitos do titular (LGPD) — pendente
 - [ ] `/configuracoes/meus-dados` — exportar dados pessoais em JSON
-- [ ] Solicitação de exclusão: soft delete + anonimização após 30 dias
-- [ ] Logs de auditoria mantidos por 5 anos (obrigação legal)
+- [ ] Anonimização 30 dias após solicitação de exclusão
+- [ ] Logs de auditoria retidos por 5 anos
 
 ---
 
-## Fase 6 — Módulos (portagem do check-list)
+## Fase 6 — Módulos
 
-> Cada módulo segue o fluxo: schema → SQL phpMyAdmin → aguardar confirmação → código.
+> Fluxo obrigatório: schema → SQL phpMyAdmin → aguardar confirmação → código.
 > Referência: `C:\Users\Ricardo\Blog\check-list\`
 
-### 6.1 Checklists (prioridade alta)
-
+### 6.1 Checklists — próximo
 - [ ] Schema: `checklists`, `checklist_items`, `checklist_executions`, `execution_items`
-- [ ] Funcionalidades:
-  - Criação e gestão de modelos
-  - Execução com registro de temperatura e conformidade
-  - Registro de ocorrência inline durante execução
-  - Histórico e relatório de execuções
-  - Dashboard com KPIs (conformidade, pendentes, atrasados)
-  - Export PDF e Excel
+- [ ] Criação e gestão de modelos de checklist
+- [ ] Execução com registro de temperatura e conformidade por item
+- [ ] Registro de ocorrência inline durante execução
+- [ ] Histórico de execuções com filtros
+- [ ] Dashboard com KPIs (conformidade %, pendentes, atrasados)
+- [ ] Export PDF e Excel
 - [ ] Roles: ADMIN/GESTOR cria modelos; EXECUTOR executa; AUDITOR só lê
 
-### 6.2 Intercorrências (prioridade alta)
-
+### 6.2 Intercorrências
 - [ ] Schema: `intercorrencias`, `intercorrencia_acompanhamentos`, `intercorrencia_anexos`
-- [ ] Funcionalidades:
-  - Abertura manual ou automática via checklist
-  - Classificação: tipo, gravidade, setor, responsável
-  - Timeline de acompanhamentos com anexos
-  - Encerramento com registro de resolução
-  - Notificação por e-mail e WhatsApp ao abrir
-  - Dashboard com KPIs (abertas, por gravidade, tempo médio de resolução)
+- [ ] Abertura manual ou automática via checklist
+- [ ] Classificação: tipo, gravidade, setor, responsável
+- [ ] Timeline de acompanhamentos com anexos
+- [ ] Notificação por e-mail ao abrir
+- [ ] Dashboard com KPIs
 
-### 6.3 Rastreabilidade (prioridade média)
-
+### 6.3 Rastreabilidade
 - [ ] Schema: `ativos`, `ativo_movimentacoes`, `ativo_manutencoes`
-- [ ] Funcionalidades:
-  - Cadastro de ativos com QR code gerado
-  - Movimentações entre locais e responsáveis
-  - Histórico de manutenções preventivas e corretivas
-  - Alertas de vencimento de calibração/manutenção
+- [ ] Cadastro de ativos com QR code
+- [ ] Movimentações e histórico de manutenções
 
-### 6.4 Planos de Ação (prioridade média)
-
+### 6.4 Planos de Ação
 - [ ] Schema: `planos`, `plano_acoes`, `acao_acompanhamentos`
-- [ ] Funcionalidades:
-  - Criação com metodologia 5W2H
-  - Ações com responsável, prazo e evidência
-  - Progresso visual por plano
-  - Vinculação a intercorrências (causa raiz)
+- [ ] Metodologia 5W2H, progresso visual, vinculação a intercorrências
 
-### 6.5 Captura (prioridade baixa — já existe no demandoo)
-
+### 6.5 Captura
 - [ ] Schema: `demandas` (tipo: DEMANDA | TAREFA | IDEIA)
-- [ ] Referência completa: `C:\Users\Ricardo\Blog\demandoo\`
-- [ ] Integração: captura pode gerar intercorrência ou plano de ação
+- [ ] Referência: `C:\Users\Ricardo\Blog\demandoo\`
 
 ---
 
 ## Fase 7 — Inteligência Artificial
-
-> OpenAI já integrado no check-list. Centralizar em `src/lib/ai.ts`.
-
-- [ ] `src/lib/ai.ts` — wrapper com timeout, retry (3x) e fallback gracioso
-- [ ] Log de tokens consumidos por empresa (para billing futuro)
-- [ ] Funcionalidades:
-
-  | Funcionalidade | Módulo | Descrição |
-  |---|---|---|
-  | Classificação automática | Captura | Categorizar captura em Demanda/Tarefa/Ideia |
-  | Sugestão de intercorrência | Checklists | Temperatura fora do range → sugerir abertura |
-  | Resumo para WhatsApp | Intercorrências | Resumir intercorrência em mensagem curta |
-  | Sugestão de causa raiz | Planos de Ação | Sugerir 5W2H baseado na intercorrência |
-
----
+- [ ] `src/lib/ai.ts` — wrapper OpenAI com timeout, retry (3x) e fallback
+- [ ] Sugestão de intercorrência em checklist; classificação em captura; resumo para WhatsApp
 
 ## Fase 8 — WhatsApp
-
-> Z-API (brasileiro, WhatsApp Business API, ~R$97/mês).
-
-- [ ] Conta Z-API: zapi.io
-- [ ] Env vars: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`
-- [ ] `src/lib/whatsapp.ts` — `sendWhatsApp({ phone, message })`
-- [ ] Nunca enviar em dev — verificar `NODE_ENV !== 'production'`
-- [ ] Notificações:
-  - Intercorrência aberta → responsável + gestor
-  - Checklist com atraso → executor responsável
-  - Ação vencida → responsável pela ação
-- [ ] Configuração por empresa: habilitar/desabilitar, número do responsável
-
----
+- [ ] Z-API (zapi.io, ~R$97/mês) — `src/lib/whatsapp.ts`
+- [ ] Notificações: intercorrência aberta, checklist atrasado, ação vencida
 
 ## Fase 9 — Cron Jobs
+- [ ] cron-job.org + rotas `GET /api/cron/[job]` protegidas por `CRON_SECRET`
+- [ ] Jobs: checklists atrasados, ações vencidas, limpar tokens expirados, relatório semanal
 
-> cron-job.org chama rotas protegidas por `CRON_SECRET`.
+## Fase 10 — Monitoramento
+- [ ] Sentry (`@sentry/nextjs`) — erros em produção
+- [ ] UptimeRobot — alerta se o site cair
+- [ ] `npm audit` antes de cada merge
 
-- [ ] Rota padrão: `GET /api/cron/[job]` com `Authorization: Bearer {CRON_SECRET}`
-- [ ] Middleware deve ter exceção: `pathname.startsWith("/api/cron")`
-- [ ] Jobs planejados:
-
-  | Job | Frequência | Ação |
-  |---|---|---|
-  | `checklists-atrasados` | Diário 08h BRT | Notificar checklists não executados |
-  | `acoes-vencidas` | Diário 08h BRT | Notificar ações de plano no prazo |
-  | `limpar-tokens` | Semanal | Deletar tokens expirados (invites, resets) |
-  | `relatorio-semanal` | Semanal | E-mail de resumo para gestores |
+## Fase 11 — Billing (quando produto validado)
+- [ ] Stripe ou PagSeguro, webhooks de pagamento, e-mails de cobrança
 
 ---
 
-## Fase 10 — Monitoramento e Qualidade
+## SQL pendente — rodar no phpMyAdmin
 
-- [ ] **Sentry** — `@sentry/nextjs` para rastrear erros em produção
-- [ ] **UptimeRobot** (free) — alerta por e-mail se o site cair
-- [ ] **npm audit** — rodar antes de cada merge; corrigir vulnerabilidades `high`
-- [ ] **Testes smoke** — ao menos as rotas críticas: auth, upload, módulos principais
+```sql
+-- audit_logs (necessário para /plataforma/logs funcionar)
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id            INT          NOT NULL AUTO_INCREMENT,
+  company_id    INT          NOT NULL,
+  user_id       INT          NOT NULL,
+  action        VARCHAR(100) NOT NULL,
+  entity        VARCHAR(100) NULL,
+  entity_id     INT          NULL,
+  payload_before TEXT         NULL,
+  payload_after  TEXT         NULL,
+  ip            VARCHAR(45)  NULL,
+  created_at    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  INDEX idx_audit_company (company_id),
+  INDEX idx_audit_user    (user_id),
+  INDEX idx_audit_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
 
 ---
 
-## Fase 11 — Planos e Billing (futuro)
+## Serviços externos
 
-> Estrutura para quando o produto estiver validado com usuários reais.
-
-| Plano | Usuários | Módulos | Storage |
+| Serviço | Uso | Custo | Status |
 |---|---|---|---|
-| FREE | 3 | 1 | 500 MB |
-| STARTER | 10 | 3 | 5 GB |
-| PROFESSIONAL | 50 | 5 | 20 GB |
-| ENTERPRISE | ilimitado | 5 | ilimitado |
-
-- [ ] Integração Stripe ou PagSeguro (pagamento em BRL)
-- [ ] Webhooks de pagamento → atualizar `company.plan`
-- [ ] E-mails de trial expirando, cobrança, cancelamento
-
----
-
-## Serviços externos a contratar
-
-| Serviço | Uso | Custo | Link |
-|---|---|---|---|
-| Google OAuth | Login social | Grátis | console.cloud.google.com |
-| Cloudinary | Upload de arquivos | Free 25 GB | cloudinary.com |
-| OpenAI | IA | ~$0.01/req | platform.openai.com |
-| Z-API | WhatsApp Business | ~R$97/mês | zapi.io |
-| Upstash Redis | Rate limiting | Free 10k req/dia | upstash.com |
-| Sentry | Monitoramento de erros | Free 5k events/mês | sentry.io |
-| UptimeRobot | Uptime | Grátis | uptimerobot.com |
-| cron-job.org | Cron jobs | Grátis | cron-job.org |
+| Google OAuth | Login social | Grátis | ✅ Ativo |
+| Hostinger SMTP | E-mail transacional | Incluso | ✅ Ativo |
+| Cloudinary | Upload imagens/PDFs | Free 25 GB | ⏳ Pendente |
+| OpenAI | IA | ~$0.01/req | ⏳ Fase 7 |
+| Z-API | WhatsApp Business | ~R$97/mês | ⏳ Fase 8 |
+| Upstash Redis | Rate limiting | Free 10k req/dia | ⏳ Fase 1.3 |
+| Sentry | Monitoramento de erros | Free 5k events/mês | ⏳ Fase 10 |
+| UptimeRobot | Uptime | Grátis | ⏳ Fase 10 |
+| cron-job.org | Cron jobs | Grátis | ⏳ Fase 9 |
 
 ---
 
-## Ordem de execução recomendada
+## Resumo do estado atual
 
 ```
-CONCLUÍDO ✅
-  1.1  proxy.ts (middleware) ativo
-  1.2  Google OAuth (login + cadastro)
-  1.3  Validação Zod + withAuthCtx + isolamento de tenant
-  1.4  Auditoria (audit_logs + /plataforma/logs)
+✅ CONCLUÍDO
+  0    Fundação (Next.js 16, Prisma, Auth, deploy)
+  1.1  Middleware (proxy.ts)
+  1.2  Auth: login Google + OAuth publicado + redefinição de senha
+  1.3  APIs: withAuth, withAuthCtx, validateBody, assertSameCompany, assertMinRole
+  1.4  Auditoria: audit_logs schema + logAction + /plataforma/logs
   2.1  Cadastro self-service
-  2.3  Convite de usuários
+  2.3  Convite de usuários (envio, reenvio, cancelamento, aceite)
   2.4  Gestão de usuários (/configuracoes/usuarios)
+  2.5  Configurações: /configuracoes/empresa + /configuracoes/conta
   2.6  Redefinição de senha
-  3    Painel de plataforma completo
-  4    E-mail transacional (mailer + 3 templates)
+  3    Painel de plataforma completo (empresas, módulos, usuários, métricas, logs)
+  4    E-mail transacional (boas-vindas, convite, reset)
   5.1  /privacidade + /termos + cookie consent
   5.2  Versionamento legal + LegalGate
 
-PRÓXIMO
-  ⚠️  SQL audit_logs no phpMyAdmin (pendente confirmação)
+⏳ PRÓXIMO (em ordem de prioridade)
+  ⚠️  SQL audit_logs no phpMyAdmin (pendente)
+  6.1  Checklists — primeiro módulo (schema → SQL → código)
   1.5  Cloudinary upload (requer conta gratuita)
-  2.2  Wizard onboarding (puro código)
-  2.5  Configurações da empresa + conta (puro código)
-  6.1  Checklists — primeiro módulo
+  2.2  Wizard de onboarding
+  1.3  Rate limiting (Upstash) + headers de segurança
 
-DEPOIS — CONFIGURAÇÕES
-  2.2  Wizard onboarding
-  2.5  Configurações da empresa + conta
-
-MÓDULOS (em ordem de prioridade)
-  6.1  Checklists
-  6.2  Intercorrências
-  6.3  Rastreabilidade
-  6.4  Planos de Ação
-  6.5  Captura
-
-APÓS MÓDULOS ESTÁVEIS
-  7    IA
-  8    WhatsApp
-  9    Cron jobs
-  10   Sentry + UptimeRobot
-
-QUANDO PRODUTO VALIDADO
-  11   Billing
+🔮 DEPOIS
+  6.2–6.5  Demais módulos
+  7  IA · 8  WhatsApp · 9  Cron · 10  Sentry · 11  Billing
 ```
 
 ---
 
 ## Checklist pré-lançamento público
 
-- [ ] middleware.ts ativo (build mostra `ƒ Proxy (Middleware)`)
-- [ ] Todas as rotas de API validam com Zod
-- [ ] Todas as rotas verificam `companyId` da sessão
-- [ ] Nenhum segredo no repositório
-- [ ] `/privacidade` e `/termos` no ar
-- [ ] Cookie consent ativo
-- [ ] E-mail transacional funcionando
+- [x] Middleware ativo (build mostra `ƒ Proxy (Middleware)`)
+- [x] Validação Zod em todas as rotas com body
+- [x] Todas as rotas verificam `companyId` da sessão
+- [x] Login com Google funcionando em produção
+- [x] Nenhum segredo no repositório
+- [x] `/privacidade` e `/termos` no ar
+- [x] Cookie consent ativo
+- [x] E-mail transacional funcionando
+- [ ] SQL audit_logs rodado no phpMyAdmin
+- [ ] Rate limiting (Upstash)
 - [ ] Backup diário habilitado na Hostinger
-- [ ] Sentry ou similar configurado
+- [ ] Sentry configurado
 - [ ] UptimeRobot monitorando
 - [ ] `npm audit` sem vulnerabilidades `high` ou `critical`

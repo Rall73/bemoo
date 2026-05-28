@@ -46,7 +46,37 @@ Stack: Next.js 16 + Prisma 6 + Auth.js v5 + MySQL + Tailwind 3
 - Habilitar módulo para empresa: insert em `company_modules`
 - Middleware verifica autenticação; acesso ao módulo é verificado no layout `(app)`
 
+### APIs e segurança
+
+**Wrappers obrigatórios** — nunca chame `auth()` diretamente em rotas:
+- `withAuth(handler, minRole?)` — rotas simples sem `params` dinâmicos
+- `withAuthCtx<P>(handler, minRole?)` — rotas com `params` dinâmicos (Next.js 16: `params` é Promise)
+
+```typescript
+// Rota simples
+export const PATCH = withAuth(async (req, session) => { ... })
+
+// Rota dinâmica
+export const GET = withAuthCtx<{ id: string }>(async (req, session, params) => {
+  const { id } = params  // já awaited pelo wrapper
+})
+```
+
+- `validateBody(req, zSchema)` — validação Zod; retorna `{ data }` ou `{ error: NextResponse }`
+- `assertSameCompany(sessionCompanyId, resourceCompanyId)` — retorna 403 se divergir
+- `assertMinRole(userRole, minRole)` — hierarquia: ADMIN > GESTOR > EXECUTOR > AUDITOR
+
+**Tenant isolation:** toda query de domínio filtra por `companyId` da sessão — **nunca** da URL.
+
+**Auditoria** (`src/lib/audit.ts`):
+- `logAction({ companyId, userId, action, entity?, entityId?, payloadBefore?, payloadAfter?, ip? })` — fire-and-forget, nunca lança
+- `getIp(req)` — extrai IP do header `x-forwarded-for` ou `x-real-ip`
+- Tipo `AuditAction` — usar sempre para type safety (ex.: `"empresa.editada"`, `"modulo.habilitado"`)
+- Logar **antes e depois** em mutações relevantes (campo `payloadBefore` / `payloadAfter`)
+
 ### Deploy
 - Portão pré-push: `npx tsc --noEmit` → `npx next build` → `git push origin main`
 - Commit semântico via HEREDOC, arquivos nomeados (nunca `git add -A`)
 - Sem segredos no repo
+- ⚠️ **PowerShell + acentos:** `git commit -m @'...'@` (here-string) falha com caracteres acentuados.
+  Use `-m "..."` simples, ou escreva mensagem sem acento no here-string.
