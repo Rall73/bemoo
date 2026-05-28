@@ -1,7 +1,7 @@
 # bemoo — Pipeline de Desenvolvimento
 
 > Documento vivo. Atualizar a cada sprint concluída.
-> Última revisão: 2026-05-28
+> Última revisão: 2026-05-28 (atualizado pós Fase 3)
 >
 > Documentação operacional separada:
 > - **[LEGAL-VERSIONING.md](./LEGAL-VERSIONING.md)** — como publicar novas versões de Termos e Política
@@ -45,7 +45,7 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 
 ### 1.2 Autenticação reforçada
 
-- [ ] **Login com Google (OAuth)**
+- [ ] **Login com Google (OAuth)** *(configuração no Google Cloud Console pendente)*
   - Configurar projeto em console.cloud.google.com
   - Env vars: `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`
   - Tabela `accounts` para vincular provedor à conta existente
@@ -99,16 +99,16 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 
 ## Fase 2 — Onboarding e Gestão de Conta
 
-### 2.1 Cadastro self-service
+### 2.1 Cadastro self-service (concluído)
 
-- [ ] Página `/cadastro`:
+- [x] Página `/cadastro`:
   - Campos: nome da empresa, e-mail, senha, aceite dos termos (obrigatório)
   - Validação: e-mail único, senha mínimo 8 chars com número
   - Cria Company (plano FREE) + User (role ADMIN)
   - Envia e-mail de boas-vindas
-  - Redireciona para wizard de onboarding
+  - Grava aceite das versões legais ativas
 
-### 2.2 Wizard de onboarding (pós-cadastro)
+### 2.2 Wizard de onboarding (pós-cadastro) — pendente
 
 - [ ] Campo `onboarding_completed_at DATETIME` na tabela companies
 - [ ] Passo 1 — Perfil: nome fantasia, segmento, tamanho da empresa
@@ -116,16 +116,18 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 - [ ] Passo 3 — Time: convidar colaboradores por e-mail (opcional, pode pular)
 - [ ] Passo 4 — Concluído: tela de celebração + acesso ao dashboard
 
-### 2.3 Convite de usuários
+### 2.3 Convite de usuários (concluído)
 
-- [ ] Tabela `invites (id, company_id, email, role, token, expires_at, accepted_at)`
-- [ ] Fluxo: ADMIN convida → e-mail com link tokenizado → convidado define senha
-- [ ] Token expira em 48h; reenvio disponível; uso único
+- [x] Tabela `invites (id, company_id, email, role, token, expires_at, accepted_at)`
+- [x] Fluxo: ADMIN convida → e-mail com link tokenizado → convidado define senha
+- [x] Token expira em 48h; reenvio disponível; uso único
+- [x] Página pública `/aceitar-convite?token=xxx` com formulário de senha
+- [x] `POST /api/aceitar-convite` — cria user + marca invite + grava aceite legal
 
-### 2.4 Gestão de usuários
+### 2.4 Gestão de usuários (concluído)
 
-- [ ] `/configuracoes/usuarios` — listar, convidar, editar role, desativar
-- [ ] Papéis de acesso:
+- [x] `/configuracoes/usuarios` — listar, convidar, editar role, desativar
+- [x] Papéis de acesso:
 
   | Role | O que pode fazer |
   |---|---|
@@ -134,54 +136,57 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
   | EXECUTOR | Criar/editar próprios registros |
   | AUDITOR | Somente leitura em tudo |
 
+- [x] APIs: `PATCH /api/usuarios/[id]` (role), `DELETE /api/usuarios/[id]` (desativar)
+- [x] APIs: `POST/DELETE/PATCH /api/usuarios/convite` e `/api/usuarios/convite/[id]`
+
 ### 2.5 Configurações da empresa
 
 - [ ] `/configuracoes/empresa` — nome, logo, CNPJ, e-mail de contato
 - [ ] `/configuracoes/conta` — trocar senha, vincular Google, foto de perfil
 - [ ] `/configuracoes/modulos` — ver módulos ativos (admin de plataforma ativa/desativa)
 
-### 2.6 Redefinição de senha
+### 2.6 Redefinição de senha (concluído)
 
-- [ ] Tabela `password_resets (email, token, expires_at, used_at)`
-- [ ] Página `/redefinir-senha` com formulário de e-mail
-- [ ] Página `/redefinir-senha?token=xxx` para nova senha
-- [ ] Token expira em 1h; uso único
+- [x] Tabela `password_resets (email, token, expires_at, used_at)`
+- [x] Página `/redefinir-senha` com formulário de e-mail
+- [x] Página `/redefinir-senha?token=xxx` para nova senha
+- [x] Token expira em 1h; uso único
 
 ---
 
-## Fase 3 — Painel de Plataforma (super admin)
+## Fase 3 — Painel de Plataforma (super admin) (concluído)
 
 > Grupo de rota `(plataforma)`, protegido por `platformAdmin = true` no layout.
 > Nunca depender só de ocultar o link — verificar no servidor.
 
-- [ ] `/plataforma/empresas` — listar, buscar, filtrar por plano/status
-- [ ] `/plataforma/empresas/[id]` — detalhes, editar plano, suspender/reativar
-- [ ] `/plataforma/empresas/[id]/modulos` — toggles de módulos
-- [ ] `/plataforma/empresas/nova` — criar empresa manualmente (vendas diretas)
-- [ ] `/plataforma/usuarios` — todos os usuários da plataforma
-- [ ] `/plataforma/logs` — audit_logs paginado com filtros
-- [ ] `/plataforma/metricas` — empresas ativas, usuários, módulos mais usados
+- [x] `/plataforma/empresas` — listar, buscar, filtrar por plano/status
+- [x] `/plataforma/empresas/[id]` — detalhes, editar dados, suspender/reativar
+- [x] `/plataforma/empresas/[id]/modulos` — toggles de módulos com switch animado
+- [x] `/plataforma/empresas/nova` — criar empresa manualmente (vendas diretas)
+- [x] `/plataforma/usuarios` — todos os usuários da plataforma
+- [ ] `/plataforma/logs` — audit_logs paginado com filtros *(depende da Fase 1.4)*
+- [x] `/plataforma/metricas` — empresas ativas, usuários, módulos mais usados
 
 ---
 
-## Fase 4 — E-mail Transacional
+## Fase 4 — E-mail Transacional (concluído)
 
 > Nodemailer + SMTP Hostinger. Senha do mailbox: apenas alphanum + `_` (sem `#@!$`).
 
-- [ ] Criar caixa: `noreply@bemoo.net` no painel Hostinger
-- [ ] `src/lib/mailer.ts` — função `sendMail({ to, subject, html })`
-  - Criar transporter dentro da função (nunca singleton de módulo)
+- [x] Caixa `noreply@bemoo.net` no painel Hostinger
+- [x] `src/lib/mailer.ts` — `sendMail({ to, subject, html, text })`
+  - Transporter criado dentro da função (nunca singleton)
   - `tls: { rejectUnauthorized: false }`
-- [ ] Templates em `src/emails/`:
+- [x] Templates em `src/emails/`:
 
-  | Template | Disparado quando |
-  |---|---|
-  | `boas-vindas` | Cadastro concluído |
-  | `convite` | ADMIN convida colaborador |
-  | `redefinir-senha` | Solicitação de reset |
-  | `notificacao-intercorrencia` | Intercorrência aberta |
-  | `checklist-atrasado` | Checklist não executado no prazo |
-  | `acao-vencida` | Ação de plano com prazo ultrapassado |
+  | Template | Disparado quando | Status |
+  |---|---|---|
+  | `boas-vindas` | Cadastro concluído | ✅ |
+  | `convite` | ADMIN convida colaborador | ✅ |
+  | `redefinir-senha` | Solicitação de reset / nova empresa | ✅ |
+  | `notificacao-intercorrencia` | Intercorrência aberta | ⏳ Fase 6.2 |
+  | `checklist-atrasado` | Checklist não executado no prazo | ⏳ Fase 9 |
+  | `acao-vencida` | Ação de plano com prazo ultrapassado | ⏳ Fase 9 |
 
 ---
 
@@ -369,29 +374,28 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 ## Ordem de execução recomendada
 
 ```
-AGORA
-  1.1  Renomear proxy.ts → middleware.ts
-  1.3  Validação Zod + isolamento de tenant
-  1.4  Auditoria (audit_logs)
-  1.5  Cloudinary upload
-
-SEMANA 1
+CONCLUÍDO ✅
+  1.1  proxy.ts (middleware) ativo
   2.1  Cadastro self-service
   2.3  Convite de usuários
+  2.4  Gestão de usuários (/configuracoes/usuarios)
   2.6  Redefinição de senha
-  4    E-mail transacional (mailer + templates)
+  3    Painel de plataforma completo (exceto /logs)
+  4    E-mail transacional (mailer + 3 templates)
+  5.1  /privacidade + /termos + cookie consent
+  5.2  Versionamento legal + LegalGate
 
-SEMANA 2
-  2.2  Wizard onboarding
-  2.4  Gestão de usuários
-  2.5  Configurações
-  5    Páginas /privacidade + /termos + cookie consent
-
-SEMANA 3
+PRÓXIMO — SEGURANÇA (recomendado antes dos módulos)
   1.2  Google OAuth
-  3    Painel de plataforma (super admin)
+  1.3  Validação Zod reforçada + isolamento de tenant (assertSameCompany)
+  1.4  Auditoria (audit_logs) → desbloqueia /plataforma/logs
+  1.5  Cloudinary upload
 
-SEMANAS 4-8 (módulos — nesta ordem)
+DEPOIS — CONFIGURAÇÕES
+  2.2  Wizard onboarding
+  2.5  Configurações da empresa + conta
+
+MÓDULOS (em ordem de prioridade)
   6.1  Checklists
   6.2  Intercorrências
   6.3  Rastreabilidade
