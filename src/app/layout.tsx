@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { Manrope, Inter } from "next/font/google"
+import { CookieBanner } from "@/components/CookieBanner"
 import "./globals.css"
 
 const manrope = Manrope({
@@ -40,7 +41,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className={`${manrope.variable} ${inter.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <CookieBanner />
+      </body>
     </html>
   )
 }

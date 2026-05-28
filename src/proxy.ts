@@ -8,6 +8,11 @@ export default auth((req) => {
   const isPublicRoute =
     pathname === "/" ||
     pathname.startsWith("/login") ||
+    pathname.startsWith("/cadastro") ||
+    pathname.startsWith("/redefinir-senha") ||
+    pathname.startsWith("/aceitar-convite") ||
+    pathname.startsWith("/privacidade") ||
+    pathname.startsWith("/termos") ||
     pathname.startsWith("/api/auth")
 
   if (!isPublicRoute && !isAuthenticated) {
