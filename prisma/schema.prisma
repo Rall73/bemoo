@@ -36,13 +36,16 @@ model Company {
   document    String?
   email       String    @unique
   plan        Plan      @default(FREE)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  deletedAt   DateTime? @map("deleted_at")
-  suspendedAt DateTime? @map("suspended_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  deletedAt    DateTime? @map("deleted_at")
+  suspendedAt  DateTime? @map("suspended_at")
+  featureAudio Boolean   @default(false) @map("feature_audio")
 
-  users     User[]
-  modules   CompanyModule[]
-  auditLogs AuditLog[]
+  users      User[]
+  modules    CompanyModule[]
+  auditLogs  AuditLog[]
+  checklists Checklist[]
+  executions ChecklistExecution[]
 
   @@map("companies")
 }
@@ -59,9 +62,11 @@ model User {
   deletedAt     DateTime? @map("deleted_at")
   deletedBy     Int?      @map("deleted_by")
 
-  company          Company           @relation(fields: [companyId], references: [id])
-  legalAcceptances LegalAcceptance[]
-  auditLogs        AuditLog[]
+  company              Company              @relation(fields: [companyId], references: [id])
+  legalAcceptances     LegalAcceptance[]
+  auditLogs            AuditLog[]
+  checklistsCreated    Checklist[]          @relation("ChecklistCreator")
+  checklistExecutions  ChecklistExecution[] @relation("ChecklistExecutor")
 
   @@index([companyId])
   @@map("users")
@@ -148,6 +153,105 @@ model LegalAcceptance {
   @@unique([userId, legalVersionId])
   @@index([userId])
   @@map("legal_acceptances")
+}
+
+// ─── Checklists ───────────────────────────────────────────────────
+
+enum ChecklistItemType {
+  BOOLEAN
+  TEXT
+  NUMBER
+  TEMPERATURE
+}
+
+enum ExecutionStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Checklist {
+  id          Int       @id @default(autoincrement())
+  companyId   Int       @map("company_id")
+  name        String    @db.VarChar(200)
+  description String?   @db.Text
+  active      Boolean   @default(true)
+  createdBy   Int       @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  deletedBy   Int?      @map("deleted_by")
+
+  company    Company              @relation(fields: [companyId], references: [id])
+  creator    User                 @relation("ChecklistCreator", fields: [createdBy], references: [id])
+  items      ChecklistItem[]
+  executions ChecklistExecution[]
+
+  @@index([companyId])
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id          Int               @id @default(autoincrement())
+  checklistId Int               @map("checklist_id")
+  order       Int               @default(0)
+  label       String            @db.VarChar(500)
+  description String?           @db.Text
+  required    Boolean           @default(true)
+  type        ChecklistItemType @default(BOOLEAN)
+  deletedAt   DateTime?         @map("deleted_at")
+  deletedBy   Int?              @map("deleted_by")
+
+  checklist Checklist       @relation(fields: [checklistId], references: [id])
+  execItems ExecutionItem[]
+
+  @@index([checklistId])
+  @@map("checklist_items")
+}
+
+model ChecklistExecution {
+  id                  Int             @id @default(autoincrement())
+  checklistId         Int             @map("checklist_id")
+  companyId           Int             @map("company_id")
+  executedBy          Int             @map("executed_by")
+  status              ExecutionStatus @default(IN_PROGRESS)
+  startedAt           DateTime        @default(now()) @map("started_at")
+  finishedAt          DateTime?       @map("finished_at")
+  conclusionNote      String?         @db.Text @map("conclusion_note")
+  reportUrl           String?         @db.VarChar(500) @map("report_url")
+  reportGeneratedAt   DateTime?       @map("report_generated_at")
+  deletedAt           DateTime?       @map("deleted_at")
+  deletedBy           Int?            @map("deleted_by")
+
+  checklist Checklist       @relation(fields: [checklistId], references: [id])
+  company   Company         @relation(fields: [companyId], references: [id])
+  executor  User            @relation("ChecklistExecutor", fields: [executedBy], references: [id])
+  items     ExecutionItem[]
+
+  @@index([companyId])
+  @@index([checklistId])
+  @@index([executedBy])
+  @@map("checklist_executions")
+}
+
+model ExecutionItem {
+  id              Int       @id @default(autoincrement())
+  executionId     Int       @map("execution_id")
+  checklistItemId Int       @map("checklist_item_id")
+  conformant      Boolean?
+  value           String?   @db.Text
+  annotation      String?   @db.Text
+  transcription   String?   @db.Text
+  photoUrl        String?   @db.VarChar(500) @map("photo_url")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  execution     ChecklistExecution @relation(fields: [executionId], references: [id])
+  checklistItem ChecklistItem      @relation(fields: [checklistItemId], references: [id])
+
+  @@unique([executionId, checklistItemId])
+  @@index([executionId])
+  @@map("execution_items")
 }
 
 // ─── Módulos habilitados por empresa ─────────────────────────────
