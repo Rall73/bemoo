@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { redirect, notFound } from "next/navigation"
 import Link from "next/link"
 import { CheckCircle, ArrowLeft, Clock, ListChecks } from "lucide-react"
+import { RelatorioPanel } from "./_components/RelatorioPanel"
 
 export default async function ResultadoPage({
   params,
@@ -13,7 +14,7 @@ export default async function ResultadoPage({
   const session = await auth() as any
   if (!session?.user) redirect("/login")
 
-  const execId    = parseInt(id)
+  const execId = parseInt(id)
   if (isNaN(execId)) notFound()
 
   const execution = await prisma.checklistExecution.findFirst({
@@ -70,6 +71,9 @@ export default async function ResultadoPage({
           <p className="text-sm text-gray-700">{execution.conclusionNote}</p>
         </div>
       )}
+
+      {/* Relatórios */}
+      <RelatorioPanel executionId={execId} />
 
       {/* Ações */}
       <div className="flex gap-3">

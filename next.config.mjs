@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Cloudinary/OpenAI usam APIs nativas do Node — não devem ser empacotadas pelo Next
-  serverExternalPackages: ["cloudinary", "openai"],
+  serverExternalPackages: ["cloudinary", "openai", "docx"],
   async headers() {
     return [
       {
