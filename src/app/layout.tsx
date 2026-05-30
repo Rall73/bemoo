@@ -23,6 +23,15 @@ export const metadata: Metadata = {
   description: "Plataforma de gestão operacional — checklists, intercorrências, rastreabilidade, planos de ação e captura de demandas.",
   keywords: ["gestão operacional", "checklist", "plano de ação", "rastreabilidade", "SaaS"],
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   openGraph: {
     siteName: "bemoo",
     locale: "pt_BR",

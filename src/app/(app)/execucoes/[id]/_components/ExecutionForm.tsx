@@ -67,9 +67,11 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
   const [pendingPhotoKey,  setPendingPhotoKey]  = useState("")   // string key "fieldId"
   const [photoUrls,        setPhotoUrls]        = useState<Record<string, string>>({})
   const [photoLoading,     setPhotoLoading]     = useState<Record<string, boolean>>({})
+  const [photoError,       setPhotoError]       = useState("")
 
   function openCamera(fieldId: number) {
     setPendingPhotoKey(String(fieldId))
+    setPhotoError("")
     photoInputRef.current!.value = ""
     photoInputRef.current!.click()
   }
@@ -79,17 +81,25 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
     if (!file || !pendingPhotoKey) return
 
     setPhotoLoading((prev) => ({ ...prev, [pendingPhotoKey]: true }))
+    setPhotoError("")
 
     const formData = new FormData()
-    formData.append("file", file)   // só o file, igual ao original
+    formData.append("file", file)
 
-    const res = await fetch("/api/upload", { method: "POST", body: formData })
-    if (res.ok) {
-      const { url } = await res.json()
-      setPhotoUrls((prev) => ({ ...prev, [pendingPhotoKey]: url }))
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData })
+      if (res.ok) {
+        const { url } = await res.json()
+        setPhotoUrls((prev) => ({ ...prev, [pendingPhotoKey]: url }))
+      } else {
+        const json = await res.json().catch(() => ({}))
+        setPhotoError(json.error ?? "Erro ao enviar a foto. Tente novamente.")
+      }
+    } catch {
+      setPhotoError("Erro de conexão ao enviar a foto.")
+    } finally {
+      setPhotoLoading((prev) => ({ ...prev, [pendingPhotoKey]: false }))
     }
-
-    setPhotoLoading((prev) => ({ ...prev, [pendingPhotoKey]: false }))
   }
 
   function removePhoto(key: string) {
@@ -596,6 +606,11 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
       </div>
 
       {/* Erros */}
+      {photoError && (
+        <div className="bg-red-50 border border-red-200 rounded-soft px-4 py-3 text-sm text-error">
+          📷 {photoError}
+        </div>
+      )}
       {audioError && (
         <div className="bg-amber-50 border border-amber-200 rounded-soft px-4 py-3 text-sm text-amber-800">
           🎤 {audioError}
