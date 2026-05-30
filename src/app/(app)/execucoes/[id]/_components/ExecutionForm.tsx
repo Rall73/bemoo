@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   ArrowLeft, CheckCircle, XCircle, Camera, X,
   Loader2, ChevronDown, ChevronUp, MessageSquare,
+  Mic, MicOff, Square,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -32,6 +33,7 @@ interface FieldValue {
   valueText:    string | null | undefined
   photoUrl:     string | null | undefined
   annotation:   string | null | undefined
+  transcription: string | null | undefined
 }
 
 interface ExecutionData {
@@ -93,6 +95,68 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
       setUploadingField(null)
       setPendingField(null)
     }
+  }
+
+  // ─── Gravação de áudio ────────────────────────────────────────────
+  const mediaRecorderRef  = useRef<MediaRecorder | null>(null)
+  const audioChunksRef    = useRef<Blob[]>([])
+  const [recordingFor,    setRecordingFor]    = useState<number | "conclusion" | null>(null)
+  const [recordingSecs,   setRecordingSecs]   = useState(0)
+  const recordingTimer    = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [transcribingFor, setTranscribingFor] = useState<number | "conclusion" | null>(null)
+
+  const startRecording = useCallback(async (target: number | "conclusion") => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr     = new MediaRecorder(stream)
+      audioChunksRef.current  = []
+      mediaRecorderRef.current = mr
+
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        const blob     = new Blob(audioChunksRef.current, { type: "audio/webm" })
+        const formData = new FormData()
+        formData.append("audio", blob, "audio.webm")
+
+        setTranscribingFor(target)
+        try {
+          const res  = await fetch("/api/transcribe", { method: "POST", body: formData })
+          const json = await res.json()
+          if (res.ok && json.data?.text) {
+            if (target === "conclusion") {
+              setConclusionNote((prev) => prev ? prev + " " + json.data.text : json.data.text)
+            } else {
+              setVal(target as number, { transcription: json.data.text })
+              // Mostra a anotação/transcrição automaticamente
+              setShowAnnotation((prev) => ({ ...prev, [target as number]: true }))
+            }
+          }
+        } catch {
+          // silently fail
+        } finally {
+          setTranscribingFor(null)
+        }
+      }
+
+      mr.start()
+      setRecordingFor(target)
+      setRecordingSecs(0)
+      recordingTimer.current = setInterval(() => setRecordingSecs((s) => s + 1), 1000)
+    } catch {
+      alert("Não foi possível acessar o microfone. Verifique as permissões do navegador.")
+    }
+  }, [])
+
+  const stopRecording = useCallback(() => {
+    if (recordingTimer.current) clearInterval(recordingTimer.current)
+    mediaRecorderRef.current?.stop()
+    setRecordingFor(null)
+    setRecordingSecs(0)
+  }, [])
+
+  function formatSecs(s: number) {
+    return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`
   }
 
   // ─── Anotação por campo (toggle) ──────────────────────────────────
@@ -385,6 +449,37 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
                           </button>
                         )}
 
+                        {/* Áudio */}
+                        {recordingFor === field.id ? (
+                          <button
+                            type="button"
+                            onClick={stopRecording}
+                            className="flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-soft border border-error text-error bg-red-50 animate-pulse"
+                          >
+                            <Square size={13} strokeWidth={2} />
+                            {formatSecs(recordingSecs)}
+                          </button>
+                        ) : transcribingFor === field.id ? (
+                          <span className="flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-soft border border-gray-200 text-gray-400">
+                            <Loader2 size={13} className="animate-spin" /> Transcrevendo...
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startRecording(field.id)}
+                            disabled={!!recordingFor}
+                            className={cn(
+                              "flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-soft border transition-colors",
+                              val.transcription
+                                ? "border-primary-200 text-primary bg-primary-50"
+                                : "border-gray-200 text-gray-400 hover:text-primary hover:border-primary-200 disabled:opacity-40"
+                            )}
+                          >
+                            <Mic size={13} strokeWidth={2} />
+                            {val.transcription ? "Regravar" : "Áudio"}
+                          </button>
+                        )}
+
                         {/* Anotação toggle */}
                         <button
                           type="button"
@@ -400,6 +495,21 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
                           {val.annotation ? "Ver anotação" : "Anotar"}
                         </button>
                       </div>
+
+                      {/* Transcrição do áudio */}
+                      {val.transcription && (
+                        <div className="bg-primary-50/40 border border-primary-100 rounded-soft px-3 py-2 space-y-1">
+                          <p className="text-[10px] font-medium text-primary flex items-center gap-1">
+                            <Mic size={10} /> Transcrição do áudio
+                          </p>
+                          <textarea
+                            value={val.transcription ?? ""}
+                            onChange={(e) => setVal(field.id, { transcription: e.target.value })}
+                            rows={2}
+                            className="w-full text-sm text-gray-800 bg-transparent focus:outline-none resize-none"
+                          />
+                        </div>
+                      )}
 
                       {/* Campo de anotação */}
                       {(showAnn || val.annotation) && (
@@ -422,12 +532,39 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
 
       {/* Observação final */}
       <div className="bg-white border border-gray-200 rounded-round p-4 space-y-2">
-        <label className="text-sm font-medium text-gray-700">Observação final (opcional)</label>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-gray-700">Observação final (opcional)</label>
+
+          {recordingFor === "conclusion" ? (
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-soft border border-error text-error bg-red-50 animate-pulse"
+            >
+              <Square size={13} strokeWidth={2} />
+              {formatSecs(recordingSecs)} — parar
+            </button>
+          ) : transcribingFor === "conclusion" ? (
+            <span className="flex items-center gap-1.5 text-xs text-gray-400">
+              <Loader2 size={13} className="animate-spin" /> Transcrevendo...
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => startRecording("conclusion")}
+              disabled={!!recordingFor}
+              className="flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-soft border border-gray-200 text-gray-400 hover:text-primary hover:border-primary-200 transition-colors disabled:opacity-40"
+            >
+              <Mic size={13} strokeWidth={2} /> Gravar áudio
+            </button>
+          )}
+        </div>
+
         <textarea
           value={conclusionNote}
           onChange={(e) => setConclusionNote(e.target.value)}
           rows={3}
-          placeholder="Observações gerais sobre esta execução..."
+          placeholder="Observações gerais sobre esta execução... ou use o microfone acima."
           className="w-full px-3 py-2.5 border border-gray-200 rounded-soft text-sm text-gray-800 bg-white focus:outline-none focus:border-primary resize-none"
         />
       </div>
