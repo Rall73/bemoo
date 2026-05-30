@@ -62,49 +62,38 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
     setValues((prev) => ({ ...prev, [fieldId]: { ...getVal(fieldId), ...patch } }))
   }
 
-  // ─── Upload de foto ───────────────────────────────────────────────
-  // Usa ref (não state) para evitar race condition com o file input
-  const photoInputRef   = useRef<HTMLInputElement>(null)
-  const pendingFieldRef = useRef<number | null>(null)
-  const [uploadingField, setUploadingField] = useState<number | null>(null)
-  const [photoError,     setPhotoError]     = useState("")
+  // ─── Upload de foto — idêntico ao ExecutionForm do projeto check-list ──────
+  const photoInputRef      = useRef<HTMLInputElement>(null)
+  const [pendingPhotoKey,  setPendingPhotoKey]  = useState("")   // string key "fieldId"
+  const [photoUrls,        setPhotoUrls]        = useState<Record<string, string>>({})
+  const [photoLoading,     setPhotoLoading]     = useState<Record<string, boolean>>({})
 
   function openCamera(fieldId: number) {
-    pendingFieldRef.current = fieldId
-    setPhotoError("")
-    if (photoInputRef.current) {
-      photoInputRef.current.value = ""
-      photoInputRef.current.click()
-    }
+    setPendingPhotoKey(String(fieldId))
+    photoInputRef.current!.value = ""
+    photoInputRef.current!.click()
   }
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file    = e.target.files?.[0]
-    const fieldId = pendingFieldRef.current
-    if (!file || !fieldId) return
+    const file = e.target.files?.[0]
+    if (!file || !pendingPhotoKey) return
 
-    setUploadingField(fieldId)
-    setPhotoError("")
+    setPhotoLoading((prev) => ({ ...prev, [pendingPhotoKey]: true }))
 
-    const form = new FormData()
-    form.append("file",        file)
-    form.append("executionId", String(execution.id))
-    form.append("fieldId",     String(fieldId))
+    const formData = new FormData()
+    formData.append("file", file)   // só o file, igual ao original
 
-    try {
-      const res  = await fetch("/api/upload/checklist", { method: "POST", body: form })
-      const json = await res.json()
-      if (res.ok) {
-        setVal(fieldId, { photoUrl: json.data.url })
-      } else {
-        setPhotoError(json.message ?? "Erro ao enviar foto.")
-      }
-    } catch {
-      setPhotoError("Erro de conexão ao enviar foto.")
-    } finally {
-      setUploadingField(null)
-      pendingFieldRef.current = null
+    const res = await fetch("/api/upload", { method: "POST", body: formData })
+    if (res.ok) {
+      const { url } = await res.json()
+      setPhotoUrls((prev) => ({ ...prev, [pendingPhotoKey]: url }))
     }
+
+    setPhotoLoading((prev) => ({ ...prev, [pendingPhotoKey]: false }))
+  }
+
+  function removePhoto(key: string) {
+    setPhotoUrls((prev) => { const n = { ...prev }; delete n[key]; return n })
   }
 
   // ─── Gravação de áudio ────────────────────────────────────────────
@@ -242,7 +231,7 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
         setSaveError(`Obrigatório: "${field.label}"`)
         return
       }
-      if (field.requirePhoto && !v.photoUrl) {
+      if (field.requirePhoto && !photoUrls[String(field.id)]) {
         setSaveError(`Foto obrigatória: "${field.label}"`)
         return
       }
@@ -257,8 +246,9 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
           valueOkNok:   (f.type === "OK_NOK" || f.type === "SIM_NAO") ? (v.valueOkNok ?? null) : null,
           valueNumeric: f.type === "NUMERIC" ? (v.valueNumeric ?? null) : null,
           valueText:    f.type === "TEXT" ? (v.valueText ?? null) : null,
-          photoUrl:     v.photoUrl ?? null,
+          photoUrl:     photoUrls[String(f.id)] ?? null,   // ← usa photoUrls separado
           annotation:   v.annotation ?? null,
+          transcription: v.transcription ?? null,
         }
       })
 
@@ -360,9 +350,11 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
             {!isCollapsed && (
               <div className="divide-y divide-gray-100">
                 {itemFields.map((field) => {
-                  const val              = getVal(field.id)
-                  const isUploading      = uploadingField === field.id
-                  const showAnn          = showAnnotation[field.id]
+                  const val             = getVal(field.id)
+                  const photoKey        = String(field.id)
+                  const photoUrl        = photoUrls[photoKey]
+                  const isPhotoLoading  = photoLoading[photoKey]
+                  const showAnn         = showAnnotation[field.id]
 
                   return (
                     <div key={field.id} className="px-4 py-4 space-y-3">
@@ -443,20 +435,20 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
 
                       {/* Foto + Anotação */}
                       <div className="flex items-center gap-3 pt-1">
-                        {/* Foto */}
-                        {val.photoUrl ? (
+                        {/* Foto — idêntico ao ExecutionForm do check-list */}
+                        {photoUrl ? (
                           <div className="flex items-center gap-2">
-                            <a href={val.photoUrl} target="_blank" rel="noopener noreferrer">
+                            <a href={photoUrl} target="_blank" rel="noopener noreferrer">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={val.photoUrl}
+                                src={photoUrl}
                                 alt="Foto"
                                 className="w-14 h-14 rounded-soft object-cover border border-gray-200"
                               />
                             </a>
                             <button
                               type="button"
-                              onClick={() => setVal(field.id, { photoUrl: null })}
+                              onClick={() => removePhoto(photoKey)}
                               className="flex items-center gap-1 text-xs text-error hover:text-error/80"
                             >
                               <X size={12} /> Remover
@@ -466,7 +458,7 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
                           <button
                             type="button"
                             onClick={() => openCamera(field.id)}
-                            disabled={isUploading}
+                            disabled={isPhotoLoading}
                             className={cn(
                               "flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-soft border transition-colors",
                               field.requirePhoto
@@ -474,12 +466,12 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
                                 : "border-gray-200 text-gray-400 hover:text-primary hover:border-primary-200"
                             )}
                           >
-                            {isUploading ? (
+                            {isPhotoLoading ? (
                               <Loader2 size={13} className="animate-spin" />
                             ) : (
                               <Camera size={13} strokeWidth={2} />
                             )}
-                            {isUploading ? "Enviando..." : field.requirePhoto ? "Tirar foto *" : "Foto"}
+                            {isPhotoLoading ? "Enviando..." : field.requirePhoto ? "Tirar foto *" : "Foto"}
                           </button>
                         )}
 
@@ -604,11 +596,6 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
       </div>
 
       {/* Erros */}
-      {photoError && (
-        <div className="bg-red-50 border border-red-200 rounded-soft px-4 py-3 text-sm text-error">
-          📷 {photoError}
-        </div>
-      )}
       {audioError && (
         <div className="bg-amber-50 border border-amber-200 rounded-soft px-4 py-3 text-sm text-amber-800">
           🎤 {audioError}
