@@ -1,7 +1,7 @@
 # bemoo — Pipeline de Desenvolvimento
 
 > Documento vivo. Atualizar a cada sprint concluída.
-> Última revisão: 2026-05-28
+> Última revisão: 2026-05-29
 >
 > Documentação operacional separada:
 > - **[LEGAL-VERSIONING.md](./LEGAL-VERSIONING.md)** — como publicar novas versões de Termos e Política
@@ -60,15 +60,23 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 ### 1.4 Auditoria ✅
 - [x] Modelo `AuditLog` no schema Prisma com relações para `Company` e `User`
 - [x] `src/lib/audit.ts` — `logAction()` (nunca lança) + `getIp()` + tipo `AuditAction`
-- [x] Log plugado em: role change, desativar usuário, convites, empresa editar/suspender/reativar, módulo habilitar/desabilitar, configurações de empresa e conta
+- [x] Log plugado em: role change, desativar usuário, convites, empresa editar/suspender/reativar, módulo habilitar/desabilitar, configurações, checklist executado
 - [x] `/plataforma/logs` — tabela paginada com filtros por empresa e ação
-- ⚠️ **SQL pendente:** tabela `audit_logs` precisa ser criada no phpMyAdmin (SQL abaixo)
+- [x] SQL `audit_logs` rodado no phpMyAdmin
 
-### 1.5 Upload de arquivos (Cloudinary)
-- [ ] Conta gratuita em cloudinary.com
-- [ ] Env vars: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
-- [ ] Rota `POST /api/upload` — autenticada, lista branca de tipos, max 10 MB, pasta por empresa
-- [ ] Nunca expor API key no client — upload sempre server-side
+### 1.5 Upload de arquivos (Cloudinary) ✅
+- [x] Conta criada — Cloud Name `dxuofvx3i` (atenção ao "v"!)
+- [x] Env vars: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_UPLOAD_PRESET`
+- [x] `src/lib/cloudinary.ts` — upload, delete por URL, delete em lote ao soft delete
+- [x] Rota `POST /api/upload` — autenticada, base64 data URI, max 15 MB, pasta por empresa
+- [x] Foto otimizada: WebP 1200px q75 via preset; upload sempre server-side
+- [x] `serverExternalPackages: ["cloudinary", "openai"]` no next.config.mjs
+
+### 1.6 IA — Whisper (transcrição de áudio) ✅
+- [x] Conta OpenAI — chave `bemoo` com permissão **All** (Whisper não tem toggle em Restricted)
+- [x] `OPENAI_API_KEY` na Hostinger
+- [x] Rota `POST /api/transcribe` — lazy singleton, whisper-1, language=pt, áudio descartado
+- [x] `Permissions-Policy: camera=(self), microphone=(self)` (sem isso o microfone não pede permissão)
 
 ---
 
@@ -171,15 +179,33 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 > Fluxo obrigatório: schema → SQL phpMyAdmin → aguardar confirmação → código.
 > Referência: `C:\Users\Ricardo\Blog\check-list\`
 
-### 6.1 Checklists — próximo
-- [ ] Schema: `checklists`, `checklist_items`, `checklist_executions`, `execution_items`
-- [ ] Criação e gestão de modelos de checklist
-- [ ] Execução com registro de temperatura e conformidade por item
-- [ ] Registro de ocorrência inline durante execução
-- [ ] Histórico de execuções com filtros
+### 6.1 Checklists — em produção (estrutura base ✅)
+
+**Arquitetura de 3 níveis** (igual ao check-list original):
+`Checklist` → `ChecklistItem` (seção/agrupador) → `ChecklistItemField` (campo de medição)
+
+- [x] Schema: `checklists`, `checklist_items`, `checklist_item_fields`, `checklist_executions`, `execution_field_values`
+- [x] Enums: `FieldType` (OK_NOK | SIM_NAO | NUMERIC | TEXT), `ExecutionStatus`
+- [x] Flag `companies.feature_audio` — controle de permissão de áudio por empresa
+- [x] CRUD de modelos: criar/editar/arquivar checklist; itens e campos inline; reordenação ↑↓
+- [x] Por campo: tipo, unidade (NUMERIC), obrigatório, exige foto
+- [x] Execução (`/execucoes/[id]`): botões OK/NOK e Sim/Não, input numérico c/ unidade, texto
+- [x] **Foto por campo** — câmera no mobile, file picker no desktop → Cloudinary
+- [x] **Áudio por campo + observação final** — MediaRecorder → Whisper → transcrição editável
+- [x] Anotação manual por campo
+- [x] Barra de progresso; finalizar valida obrigatórios + fotos obrigatórias
+- [x] Tela de resultado + histórico (`/execucoes`)
+- [x] Roles: ADMIN/GESTOR cria modelos; EXECUTOR executa; AUDITOR só lê
+- [ ] Frequência do checklist (diária/semanal/Nx dia) — adiar p/ fase de gestão/alertas
+- [ ] Relatório final editável (.docx) — 2 versões via IA (próximo)
 - [ ] Dashboard com KPIs (conformidade %, pendentes, atrasados)
 - [ ] Export PDF e Excel
-- [ ] Roles: ADMIN/GESTOR cria modelos; EXECUTOR executa; AUDITOR só lê
+
+> ⚠️ **Lições da implementação** (ver memória `project_bemoo.md` § Armadilhas):
+> - `Permissions-Policy` precisa de `(self)` p/ câmera/microfone funcionarem
+> - `serverExternalPackages: ["cloudinary","openai"]` obrigatório
+> - Upload de foto = base64 data URI; `photoUrls` em estado separado
+> - Cloud name tinha typo (`dxuofx3i` → `dxuofvx3i`) — testar credencial local antes de culpar deploy
 
 ### 6.2 Intercorrências
 - [ ] Schema: `intercorrencias`, `intercorrencia_acompanhamentos`, `intercorrencia_anexos`
@@ -226,27 +252,15 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 
 ---
 
-## SQL pendente — rodar no phpMyAdmin
+## SQL — histórico (tudo já rodado no phpMyAdmin)
 
-```sql
--- audit_logs (necessário para /plataforma/logs funcionar)
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id            INT          NOT NULL AUTO_INCREMENT,
-  company_id    INT          NOT NULL,
-  user_id       INT          NOT NULL,
-  action        VARCHAR(100) NOT NULL,
-  entity        VARCHAR(100) NULL,
-  entity_id     INT          NULL,
-  payload_before TEXT         NULL,
-  payload_after  TEXT         NULL,
-  ip            VARCHAR(45)  NULL,
-  created_at    DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  PRIMARY KEY (id),
-  INDEX idx_audit_company (company_id),
-  INDEX idx_audit_user    (user_id),
-  INDEX idx_audit_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-```
+Todas as tabelas abaixo já existem em produção. Mantido como referência para
+recriação de ambiente. Detalhe do schema completo em `prisma/schema.prisma`.
+
+- `audit_logs` — auditoria (Fase 1.4)
+- `checklists`, `checklist_items`, `checklist_item_fields` — modelos (Fase 6.1)
+- `checklist_executions`, `execution_field_values` — execuções (Fase 6.1)
+- `companies.feature_audio TINYINT` — flag de permissão de áudio por empresa
 
 ---
 
@@ -256,8 +270,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 |---|---|---|---|
 | Google OAuth | Login social | Grátis | ✅ Ativo |
 | Hostinger SMTP | E-mail transacional | Incluso | ✅ Ativo |
-| Cloudinary | Upload imagens/PDFs | Free 25 GB | ⏳ Pendente |
-| OpenAI | IA | ~$0.01/req | ⏳ Fase 7 |
+| Cloudinary | Upload de fotos | Free 25 GB | ✅ Ativo (cloud `dxuofvx3i`) |
+| OpenAI | Whisper (áudio) + GPT (relatório) | ~$0.01/req | ✅ Ativo (chave All) |
 | Z-API | WhatsApp Business | ~R$97/mês | ⏳ Fase 8 |
 | Upstash Redis | Rate limiting | Free 10k req/dia | ⏳ Fase 1.3 |
 | Sentry | Monitoramento de erros | Free 5k events/mês | ⏳ Fase 10 |
@@ -275,6 +289,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   1.2  Auth: login Google + OAuth publicado + redefinição de senha
   1.3  APIs: withAuth, withAuthCtx, validateBody, assertSameCompany, assertMinRole
   1.4  Auditoria: audit_logs schema + logAction + /plataforma/logs
+  1.5  Cloudinary: upload de fotos (base64, server-side, pasta por empresa)
+  1.6  IA Whisper: transcrição de áudio (/api/transcribe)
   2.1  Cadastro self-service
   2.3  Convite de usuários (envio, reenvio, cancelamento, aceite)
   2.4  Gestão de usuários (/configuracoes/usuarios)
@@ -284,17 +300,18 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   4    E-mail transacional (boas-vindas, convite, reset)
   5.1  /privacidade + /termos + cookie consent
   5.2  Versionamento legal + LegalGate
+  6.1  Checklists: CRUD 3 níveis + execução com foto/áudio/anotação + histórico
+  PWA  Ícones de instalação (icon-192/512, apple-touch-icon)
 
 ⏳ PRÓXIMO (em ordem de prioridade)
-  ⚠️  SQL audit_logs no phpMyAdmin (pendente)
-  6.1  Checklists — primeiro módulo (schema → SQL → código)
-  1.5  Cloudinary upload (requer conta gratuita)
+  6.1+ Relatório final editável (.docx) — 2 versões via IA (GPT)
+  6.1+ Dashboard de checklists (KPIs: conformidade %, pendentes)
   2.2  Wizard de onboarding
-  1.3  Rate limiting (Upstash) + headers de segurança
+  1.3  Rate limiting (Upstash) + revisar headers de segurança
 
 🔮 DEPOIS
-  6.2–6.5  Demais módulos
-  7  IA · 8  WhatsApp · 9  Cron · 10  Sentry · 11  Billing
+  6.2–6.5  Demais módulos (Intercorrências, Rastreabilidade, Planos, Captura)
+  7  IA avançada · 8  WhatsApp · 9  Cron · 10  Sentry · 11  Billing
 ```
 
 ---

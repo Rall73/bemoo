@@ -74,6 +74,20 @@ export const GET = withAuthCtx<{ id: string }>(async (req, session, params) => {
 - Tipo `AuditAction` — usar sempre para type safety (ex.: `"empresa.editada"`, `"modulo.habilitado"`)
 - Logar **antes e depois** em mutações relevantes (campo `payloadBefore` / `payloadAfter`)
 
+### Mídia: câmera, microfone, upload (lições já pagas — NÃO repetir)
+
+> Detalhe completo na skill `hostinger-nextjs-playbook` §13 e na memória `project_bemoo.md`.
+
+- **`next.config.mjs` é crítico para mídia:**
+  - `Permissions-Policy: camera=(self), microphone=(self)` — com `()` vazio o microfone/câmera **nunca pedem permissão** (popup não aparece)
+  - `serverExternalPackages: ["cloudinary", "openai"]` — sem isso o upload/transcrição quebra em runtime
+- **Foto:** rota `/api/upload` usa **base64 data URI** (`cloudinary.uploader.upload(dataUri)`), nunca `upload_stream`+preset. No client, `photoUrls` é estado **separado** (`Record<string,string>`), não dentro dos valores do form. Input: `<input type="file" accept="image/*" capture="environment">`.
+- **Áudio:** `MediaRecorder` com `isTypeSupported()` + `streamRef` separado + `mr.start(1000)` → `/api/transcribe` → Whisper (`whisper-1`, `language:"pt"`) → texto. **Áudio nunca vai pro Cloudinary** — só a transcrição é salva.
+- **Clientes externos (OpenAI/Cloudinary):** lazy singleton, nunca `new OpenAI()` no topo do módulo (falha no build).
+- **OpenAI key:** permissão **All** (Whisper não tem toggle em "Restricted").
+- **Credencial suspeita:** teste **localmente** com script Node lendo `.env.local` antes de culpar deploy/config (um typo no `CLOUDINARY_CLOUD_NAME` derrubou tudo). Nunca hardcode secret no comando.
+- **Antes de portar foto/áudio do check-list:** leia o código que funciona lá primeiro.
+
 ### Deploy
 - Portão pré-push: `npx tsc --noEmit` → `npx next build` → `git push origin main`
 - Commit semântico via HEREDOC, arquivos nomeados (nunca `git add -A`)
