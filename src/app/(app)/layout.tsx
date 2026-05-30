@@ -1,9 +1,9 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import { NavSidebar } from "@/components/NavSidebar"
 import { getPendingVersions } from "@/lib/legal"
 import { LegalGate } from "./_components/LegalGate"
+import { AppShell } from "./_components/AppShell"
 
 export default async function AppLayout({
   children,
@@ -29,19 +29,16 @@ export default async function AppLayout({
   const enabledModules = companyModules.map((m) => m.module)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      <NavSidebar
-        user={{
-          name:          session.user.name ?? "",
-          email:         session.user.email ?? "",
-          role:          session.user.role as string,
-          platformAdmin: session.user.platformAdmin as boolean,
-        }}
-        enabledModules={enabledModules}
-      />
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
-    </div>
+    <AppShell
+      user={{
+        name:          session.user.name ?? "",
+        email:         session.user.email ?? "",
+        role:          session.user.role as string,
+        platformAdmin: session.user.platformAdmin as boolean,
+      }}
+      enabledModules={enabledModules}
+    >
+      {children}
+    </AppShell>
   )
 }

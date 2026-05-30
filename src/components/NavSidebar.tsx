@@ -8,7 +8,7 @@ import { MODULES_CONFIG } from "@/lib/modules"
 import {
   CheckSquare, AlertTriangle, Tag, Target, Inbox,
   LayoutDashboard, LogOut, ChevronRight, Users,
-  Building2, BarChart2, ScrollText, UserCircle,
+  Building2, BarChart2, ScrollText, UserCircle, X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -28,26 +28,39 @@ interface NavSidebarProps {
     platformAdmin: boolean
   }
   enabledModules: string[]
+  onClose?: () => void
 }
 
-export function NavSidebar({ user, enabledModules }: NavSidebarProps) {
+export function NavSidebar({ user, enabledModules, onClose }: NavSidebarProps) {
   const pathname = usePathname()
 
   const navModules = MODULES_CONFIG.filter((m) =>
     enabledModules.includes(m.key)
   )
 
+  function handleLinkClick() {
+    onClose?.()
+  }
+
   return (
-    <aside className="w-56 flex flex-col bg-white border-r border-gray-200 h-screen">
-      {/* Logo */}
-      <div className="px-4 py-5 border-b border-gray-100">
+    <aside className="w-64 md:w-56 flex flex-col bg-white border-r border-gray-200 h-screen">
+      {/* Logo + fechar (mobile) */}
+      <div className="px-4 py-5 border-b border-gray-100 flex items-center justify-between">
         <BemooLogo size={22} color="#1F4E4A" />
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden p-1.5 rounded-soft text-gray-400 hover:bg-gray-100 transition-colors"
+          >
+            <X size={18} strokeWidth={2} />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
         {/* Dashboard */}
-        <NavLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" current={pathname} />
+        <NavLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" current={pathname} onClick={handleLinkClick} />
 
         {/* Módulos habilitados */}
         {navModules.length > 0 && (
@@ -64,6 +77,7 @@ export function NavSidebar({ user, enabledModules }: NavSidebarProps) {
                   icon={Icon}
                   label={mod.label}
                   current={pathname}
+                  onClick={handleLinkClick}
                 />
               )
             })}
@@ -74,9 +88,9 @@ export function NavSidebar({ user, enabledModules }: NavSidebarProps) {
         <p className="px-3 pt-4 pb-1 text-[10px] font-medium uppercase tracking-widest text-gray-400">
           Configurações
         </p>
-        <NavLink href="/configuracoes/usuarios" icon={Users}       label="Usuários"  current={pathname} />
-        <NavLink href="/configuracoes/empresa"  icon={Building2}   label="Empresa"   current={pathname} />
-        <NavLink href="/configuracoes/conta"    icon={UserCircle}  label="Minha conta" current={pathname} />
+        <NavLink href="/configuracoes/usuarios" icon={Users}      label="Usuários"    current={pathname} onClick={handleLinkClick} />
+        <NavLink href="/configuracoes/empresa"  icon={Building2}  label="Empresa"     current={pathname} onClick={handleLinkClick} />
+        <NavLink href="/configuracoes/conta"    icon={UserCircle} label="Minha conta" current={pathname} onClick={handleLinkClick} />
 
         {/* Admin de plataforma */}
         {user.platformAdmin && (
@@ -84,10 +98,10 @@ export function NavSidebar({ user, enabledModules }: NavSidebarProps) {
             <p className="px-3 pt-4 pb-1 text-[10px] font-medium uppercase tracking-widest text-gray-400">
               Plataforma
             </p>
-            <NavLink href="/plataforma/empresas" icon={Building2}   label="Empresas" current={pathname} />
-            <NavLink href="/plataforma/usuarios" icon={Users}       label="Usuários"  current={pathname} />
-            <NavLink href="/plataforma/metricas" icon={BarChart2}   label="Métricas"  current={pathname} />
-            <NavLink href="/plataforma/logs"     icon={ScrollText}  label="Logs"      current={pathname} />
+            <NavLink href="/plataforma/empresas" icon={Building2}  label="Empresas" current={pathname} onClick={handleLinkClick} />
+            <NavLink href="/plataforma/usuarios" icon={Users}      label="Usuários"  current={pathname} onClick={handleLinkClick} />
+            <NavLink href="/plataforma/metricas" icon={BarChart2}  label="Métricas"  current={pathname} onClick={handleLinkClick} />
+            <NavLink href="/plataforma/logs"     icon={ScrollText} label="Logs"      current={pathname} onClick={handleLinkClick} />
           </>
         )}
       </nav>
@@ -116,20 +130,19 @@ export function NavSidebar({ user, enabledModules }: NavSidebarProps) {
 }
 
 function NavLink({
-  href,
-  icon: Icon,
-  label,
-  current,
+  href, icon: Icon, label, current, onClick,
 }: {
-  href: string
-  icon: React.ElementType
-  label: string
+  href:    string
+  icon:    React.ElementType
+  label:   string
   current: string
+  onClick?: () => void
 }) {
   const active = current === href || (href !== "/dashboard" && current.startsWith(href))
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={cn(
         "flex items-center gap-2.5 px-3 py-2 rounded-soft text-sm transition-colors",
         active

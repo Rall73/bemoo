@@ -63,12 +63,15 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
   }
 
   // ─── Upload de foto ───────────────────────────────────────────────
-  const photoInputRef    = useRef<HTMLInputElement>(null)
-  const [pendingField,   setPendingField]   = useState<number | null>(null)
+  // Usa ref (não state) para evitar race condition com o file input
+  const photoInputRef   = useRef<HTMLInputElement>(null)
+  const pendingFieldRef = useRef<number | null>(null)
   const [uploadingField, setUploadingField] = useState<number | null>(null)
+  const [photoError,     setPhotoError]     = useState("")
 
   function openCamera(fieldId: number) {
-    setPendingField(fieldId)
+    pendingFieldRef.current = fieldId
+    setPhotoError("")
     if (photoInputRef.current) {
       photoInputRef.current.value = ""
       photoInputRef.current.click()
@@ -76,24 +79,31 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
   }
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !pendingField) return
+    const file    = e.target.files?.[0]
+    const fieldId = pendingFieldRef.current
+    if (!file || !fieldId) return
 
-    setUploadingField(pendingField)
+    setUploadingField(fieldId)
+    setPhotoError("")
+
     const form = new FormData()
     form.append("file",        file)
     form.append("executionId", String(execution.id))
-    form.append("fieldId",     String(pendingField))
+    form.append("fieldId",     String(fieldId))
 
     try {
       const res  = await fetch("/api/upload/checklist", { method: "POST", body: form })
       const json = await res.json()
-      if (res.ok) setVal(pendingField, { photoUrl: json.data.url })
+      if (res.ok) {
+        setVal(fieldId, { photoUrl: json.data.url })
+      } else {
+        setPhotoError(json.message ?? "Erro ao enviar foto.")
+      }
     } catch {
-      // silently fail — user can retry
+      setPhotoError("Erro de conexão ao enviar foto.")
     } finally {
       setUploadingField(null)
-      setPendingField(null)
+      pendingFieldRef.current = null
     }
   }
 
@@ -105,9 +115,28 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
   const recordingTimer    = useRef<ReturnType<typeof setInterval> | null>(null)
   const [transcribingFor, setTranscribingFor] = useState<number | "conclusion" | null>(null)
 
+  const [audioError, setAudioError] = useState("")
+
   const startRecording = useCallback(async (target: number | "conclusion") => {
+    setAudioError("")
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setAudioError("Seu navegador não suporta gravação de áudio.")
+      return
+    }
+    let stream: MediaStream
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        setAudioError("Permissão de microfone negada. Clique no cadeado 🔒 na barra do navegador e permita o acesso ao microfone.")
+      } else if (err?.name === "NotFoundError") {
+        setAudioError("Nenhum microfone encontrado neste dispositivo.")
+      } else {
+        setAudioError("Não foi possível acessar o microfone.")
+      }
+      return
+    }
+    try {
       const mr     = new MediaRecorder(stream)
       audioChunksRef.current  = []
       mediaRecorderRef.current = mr
@@ -144,7 +173,7 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
       setRecordingSecs(0)
       recordingTimer.current = setInterval(() => setRecordingSecs((s) => s + 1), 1000)
     } catch {
-      alert("Não foi possível acessar o microfone. Verifique as permissões do navegador.")
+      setAudioError("Erro ao iniciar gravação.")
     }
   }, [])
 
@@ -569,7 +598,17 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
         />
       </div>
 
-      {/* Erro */}
+      {/* Erros */}
+      {photoError && (
+        <div className="bg-red-50 border border-red-200 rounded-soft px-4 py-3 text-sm text-error">
+          📷 {photoError}
+        </div>
+      )}
+      {audioError && (
+        <div className="bg-amber-50 border border-amber-200 rounded-soft px-4 py-3 text-sm text-amber-800">
+          🎤 {audioError}
+        </div>
+      )}
       {saveError && (
         <div className="bg-red-50 border border-red-200 rounded-soft px-4 py-3 text-sm text-error">
           {saveError}
