@@ -108,45 +108,43 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
   }
 
   // ─── Gravação de áudio ────────────────────────────────────────────
+  // Padrão idêntico ao NovaDemandaForm do projeto check-list (que funciona em produção)
   const mediaRecorderRef  = useRef<MediaRecorder | null>(null)
   const audioChunksRef    = useRef<Blob[]>([])
+  const streamRef         = useRef<MediaStream | null>(null)   // ← ref separada para o stream
   const [recordingFor,    setRecordingFor]    = useState<number | "conclusion" | null>(null)
   const [recordingSecs,   setRecordingSecs]   = useState(0)
   const recordingTimer    = useRef<ReturnType<typeof setInterval> | null>(null)
   const [transcribingFor, setTranscribingFor] = useState<number | "conclusion" | null>(null)
-
-  const [audioError, setAudioError] = useState("")
+  const [audioError,      setAudioError]      = useState("")
 
   const startRecording = useCallback(async (target: number | "conclusion") => {
     setAudioError("")
-    if (!navigator?.mediaDevices?.getUserMedia) {
-      setAudioError("Seu navegador não suporta gravação de áudio.")
-      return
-    }
-    let stream: MediaStream
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    } catch (err: any) {
-      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
-        setAudioError("Permissão de microfone negada. Clique no cadeado 🔒 na barra do navegador e permita o acesso ao microfone.")
-      } else if (err?.name === "NotFoundError") {
-        setAudioError("Nenhum microfone encontrado neste dispositivo.")
-      } else {
-        setAudioError("Não foi possível acessar o microfone.")
-      }
-      return
-    }
-    try {
-      const mr     = new MediaRecorder(stream)
-      audioChunksRef.current  = []
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+
+      // Detecta o mimeType suportado pelo browser (idêntico ao NovaDemandaForm)
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : ""
+
+      const mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
       mediaRecorderRef.current = mr
+      audioChunksRef.current   = []
 
       mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+
       mr.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
-        const blob     = new Blob(audioChunksRef.current, { type: "audio/webm" })
+        streamRef.current?.getTracks().forEach((t) => t.stop())
+        const blob = new Blob(audioChunksRef.current, { type: mr.mimeType || "audio/webm" })
+
+        const ext      = (mr.mimeType || "").includes("mp4") ? "mp4" : "webm"
+        const file     = new File([blob], `audio.${ext}`, { type: blob.type })
         const formData = new FormData()
-        formData.append("audio", blob, "audio.webm")
+        formData.append("audio", file)
 
         setTranscribingFor(target)
         try {
@@ -157,23 +155,30 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
               setConclusionNote((prev) => prev ? prev + " " + json.data.text : json.data.text)
             } else {
               setVal(target as number, { transcription: json.data.text })
-              // Mostra a anotação/transcrição automaticamente
               setShowAnnotation((prev) => ({ ...prev, [target as number]: true }))
             }
+          } else {
+            setAudioError("Não foi possível transcrever o áudio.")
           }
         } catch {
-          // silently fail
+          setAudioError("Erro de conexão ao transcrever.")
         } finally {
           setTranscribingFor(null)
         }
       }
 
-      mr.start()
+      mr.start(1000)   // ← coleta chunks a cada 1s (igual ao original)
       setRecordingFor(target)
       setRecordingSecs(0)
       recordingTimer.current = setInterval(() => setRecordingSecs((s) => s + 1), 1000)
-    } catch {
-      setAudioError("Erro ao iniciar gravação.")
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        setAudioError("Permissão de microfone negada. Clique no cadeado 🔒 na barra de endereço do navegador → Microfone → Permitir → recarregue a página.")
+      } else if (err?.name === "NotFoundError") {
+        setAudioError("Nenhum microfone encontrado neste dispositivo.")
+      } else {
+        setAudioError("Não foi possível acessar o microfone.")
+      }
     }
   }, [])
 

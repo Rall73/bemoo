@@ -1,16 +1,17 @@
 import OpenAI from "openai"
 import { withAuth, badRequest, ok, serverError } from "@/lib/api"
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+// Lazy singleton — não instanciar no topo (falha no build sem a env var)
+let _openai: OpenAI | null = null
+function getOpenAI() {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _openai
+}
 
-const MAX_SIZE_MB   = 25 // limite do Whisper
-const ALLOWED_TYPES = [
-  "audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg",
-  "audio/wav", "audio/x-m4a", "audio/mp3",
-]
+const MAX_SIZE_MB = 25
 
 // POST /api/transcribe
-// Body: FormData com campo "audio" (arquivo de áudio)
+// Body: FormData com campo "audio" (arquivo de áudio gravado pelo MediaRecorder)
 export const POST = withAuth(async (req) => {
   let formData: FormData
   try {
@@ -26,26 +27,27 @@ export const POST = withAuth(async (req) => {
     return badRequest(`Áudio muito grande. Máximo ${MAX_SIZE_MB} MB.`)
   }
 
-  // Whisper aceita vários formatos — converte o File para o formato esperado
-  const buffer = Buffer.from(await audio.arrayBuffer())
-
-  // Cria um File com extensão correta para o Whisper
-  const ext      = audio.type.includes("ogg") ? "ogg"
-                 : audio.type.includes("mp4") || audio.type.includes("m4a") ? "mp4"
-                 : audio.type.includes("wav") ? "wav"
-                 : "webm"
-  const audioFile = new File([buffer], `audio.${ext}`, { type: audio.type || "audio/webm" })
-
   try {
-    const response = await openai.audio.transcriptions.create({
+    const buffer = Buffer.from(await audio.arrayBuffer())
+
+    // Detecta extensão correta pelo mimeType do MediaRecorder
+    const mime = audio.type || "audio/webm"
+    const ext  = mime.includes("mp4") ? "mp4"
+               : mime.includes("ogg") ? "ogg"
+               : mime.includes("wav") ? "wav"
+               : "webm"
+
+    const audioFile = new File([buffer], `audio.${ext}`, { type: mime })
+
+    const response = await getOpenAI().audio.transcriptions.create({
       file:     audioFile,
       model:    "whisper-1",
-      language: "pt",   // português — melhora muito a precisão
+      language: "pt",
     })
 
     return ok({ text: response.text })
   } catch (err: any) {
-    console.error("[Transcribe] Erro Whisper:", err?.message ?? err)
+    console.error("[POST /api/transcribe]", err?.message ?? err)
     return serverError("Erro ao transcrever o áudio. Tente novamente.")
   }
 })
