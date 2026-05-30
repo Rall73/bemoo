@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Cloudinary/OpenAI usam APIs nativas do Node — não devem ser empacotadas pelo Next
+  serverExternalPackages: ["cloudinary", "openai"],
   async headers() {
     return [
       {
@@ -9,7 +11,8 @@ const nextConfig = {
           { key: "X-Frame-Options",           value: "DENY" },
           { key: "X-Content-Type-Options",     value: "nosniff" },
           { key: "Referrer-Policy",            value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy",         value: "camera=(), microphone=(), geolocation=()" },
+          // self = permite câmera/microfone na própria origem (necessário p/ foto e áudio)
+          { key: "Permissions-Policy",         value: "camera=(self), microphone=(self), geolocation=()" },
           { key: "X-DNS-Prefetch-Control",     value: "on" },
         ],
       },
