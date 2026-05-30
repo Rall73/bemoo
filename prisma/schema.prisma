@@ -157,11 +157,11 @@ model LegalAcceptance {
 
 // ─── Checklists ───────────────────────────────────────────────────
 
-enum ChecklistItemType {
-  BOOLEAN
+enum FieldType {
+  OK_NOK
+  SIM_NAO
+  NUMERIC
   TEXT
-  NUMBER
-  TEMPERATURE
 }
 
 enum ExecutionStatus {
@@ -191,42 +191,61 @@ model Checklist {
   @@map("checklists")
 }
 
+// Seção / agrupador de campos (ex.: "Câmara fria 1", "Limpeza")
 model ChecklistItem {
-  id          Int               @id @default(autoincrement())
-  checklistId Int               @map("checklist_id")
-  order       Int               @default(0)
-  label       String            @db.VarChar(500)
-  description String?           @db.Text
-  required    Boolean           @default(true)
-  type        ChecklistItemType @default(BOOLEAN)
-  deletedAt   DateTime?         @map("deleted_at")
-  deletedBy   Int?              @map("deleted_by")
+  id          Int       @id @default(autoincrement())
+  checklistId Int       @map("checklist_id")
+  order       Int       @default(0)
+  label       String    @db.VarChar(500)
+  description String?   @db.Text
+  deletedAt   DateTime? @map("deleted_at")
+  deletedBy   Int?      @map("deleted_by")
 
-  checklist Checklist       @relation(fields: [checklistId], references: [id])
-  execItems ExecutionItem[]
+  checklist Checklist           @relation(fields: [checklistId], references: [id])
+  fields    ChecklistItemField[]
 
   @@index([checklistId])
   @@map("checklist_items")
 }
 
-model ChecklistExecution {
-  id                  Int             @id @default(autoincrement())
-  checklistId         Int             @map("checklist_id")
-  companyId           Int             @map("company_id")
-  executedBy          Int             @map("executed_by")
-  status              ExecutionStatus @default(IN_PROGRESS)
-  startedAt           DateTime        @default(now()) @map("started_at")
-  finishedAt          DateTime?       @map("finished_at")
-  conclusionNote      String?         @db.Text @map("conclusion_note")
-  reportUrl           String?         @db.VarChar(500) @map("report_url")
-  reportGeneratedAt   DateTime?       @map("report_generated_at")
-  deletedAt           DateTime?       @map("deleted_at")
-  deletedBy           Int?            @map("deleted_by")
+// Campo de medição dentro de um item (ex.: "Temperatura", "Prateleiras limpas")
+model ChecklistItemField {
+  id           Int       @id @default(autoincrement())
+  itemId       Int       @map("item_id")
+  order        Int       @default(0)
+  label        String    @db.VarChar(500)
+  type         FieldType @default(OK_NOK)
+  unit         String?   @db.VarChar(20)   // ex.: °C, kg, %
+  required     Boolean   @default(true)
+  requirePhoto Boolean   @default(false)   @map("require_photo")
+  deletedAt    DateTime? @map("deleted_at")
+  deletedBy    Int?      @map("deleted_by")
 
-  checklist Checklist       @relation(fields: [checklistId], references: [id])
-  company   Company         @relation(fields: [companyId], references: [id])
-  executor  User            @relation("ChecklistExecutor", fields: [executedBy], references: [id])
-  items     ExecutionItem[]
+  item        ChecklistItem        @relation(fields: [itemId], references: [id])
+  fieldValues ExecutionFieldValue[]
+
+  @@index([itemId])
+  @@map("checklist_item_fields")
+}
+
+model ChecklistExecution {
+  id                Int             @id @default(autoincrement())
+  checklistId       Int             @map("checklist_id")
+  companyId         Int             @map("company_id")
+  executedBy        Int             @map("executed_by")
+  status            ExecutionStatus @default(IN_PROGRESS)
+  startedAt         DateTime        @default(now()) @map("started_at")
+  finishedAt        DateTime?       @map("finished_at")
+  conclusionNote    String?         @db.Text @map("conclusion_note")
+  reportUrl         String?         @db.VarChar(500) @map("report_url")
+  reportGeneratedAt DateTime?       @map("report_generated_at")
+  deletedAt         DateTime?       @map("deleted_at")
+  deletedBy         Int?            @map("deleted_by")
+
+  checklist   Checklist            @relation(fields: [checklistId], references: [id])
+  company     Company              @relation(fields: [companyId], references: [id])
+  executor    User                 @relation("ChecklistExecutor", fields: [executedBy], references: [id])
+  fieldValues ExecutionFieldValue[]
 
   @@index([companyId])
   @@index([checklistId])
@@ -234,24 +253,26 @@ model ChecklistExecution {
   @@map("checklist_executions")
 }
 
-model ExecutionItem {
-  id              Int       @id @default(autoincrement())
-  executionId     Int       @map("execution_id")
-  checklistItemId Int       @map("checklist_item_id")
-  conformant      Boolean?
-  value           String?   @db.Text
-  annotation      String?   @db.Text
-  transcription   String?   @db.Text
-  photoUrl        String?   @db.VarChar(500) @map("photo_url")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+// Resposta de um campo em uma execução
+model ExecutionFieldValue {
+  id           Int       @id @default(autoincrement())
+  executionId  Int       @map("execution_id")
+  fieldId      Int       @map("field_id")
+  valueOkNok   Boolean?  @map("value_ok_nok")
+  valueNumeric Decimal?  @db.Decimal(10, 2) @map("value_numeric")
+  valueText    String?   @db.Text @map("value_text")
+  photoUrl     String?   @db.VarChar(500) @map("photo_url")
+  annotation   String?   @db.Text
+  transcription String?  @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  execution     ChecklistExecution @relation(fields: [executionId], references: [id])
-  checklistItem ChecklistItem      @relation(fields: [checklistItemId], references: [id])
+  execution ChecklistExecution @relation(fields: [executionId], references: [id])
+  field     ChecklistItemField @relation(fields: [fieldId], references: [id])
 
-  @@unique([executionId, checklistItemId])
+  @@unique([executionId, fieldId])
   @@index([executionId])
-  @@map("execution_items")
+  @@map("execution_field_values")
 }
 
 // ─── Módulos habilitados por empresa ─────────────────────────────

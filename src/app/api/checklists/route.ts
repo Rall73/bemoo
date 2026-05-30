@@ -16,6 +16,10 @@ export const GET = withAuth(async (_req, session) => {
     include: {
       _count: { select: { items: { where: { deletedAt: null } } } },
       creator: { select: { name: true } },
+      items: {
+        where:   { deletedAt: null },
+        select:  { _count: { select: { fields: { where: { deletedAt: null } } } } },
+      },
     },
     orderBy: { createdAt: "desc" },
   })

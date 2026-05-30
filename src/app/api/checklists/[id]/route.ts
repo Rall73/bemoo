@@ -21,6 +21,12 @@ export const GET = withAuthCtx<{ id: string }>(async (_req, session, params) => 
       items: {
         where:   { deletedAt: null },
         orderBy: { order: "asc" },
+        include: {
+          fields: {
+            where:   { deletedAt: null },
+            orderBy: { order: "asc" },
+          },
+        },
       },
       creator: { select: { name: true } },
     },

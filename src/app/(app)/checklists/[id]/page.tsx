@@ -21,8 +21,17 @@ export default async function ChecklistDetailPage({
   const checklist = await prisma.checklist.findFirst({
     where:   { id: checklistId, companyId: session.user.companyId, deletedAt: null },
     include: {
-      items:   { where: { deletedAt: null }, orderBy: { order: "asc" } },
       creator: { select: { name: true } },
+      items: {
+        where:   { deletedAt: null },
+        orderBy: { order: "asc" },
+        include: {
+          fields: {
+            where:   { deletedAt: null },
+            orderBy: { order: "asc" },
+          },
+        },
+      },
     },
   })
 
@@ -40,13 +49,20 @@ export default async function ChecklistDetailPage({
           active:      checklist.active,
           createdBy:   checklist.creator.name,
           createdAt:   checklist.createdAt.toISOString(),
-          items:       checklist.items.map((item) => ({
+          items: checklist.items.map((item) => ({
             id:          item.id,
             order:       item.order,
             label:       item.label,
             description: item.description,
-            type:        item.type,
-            required:    item.required,
+            fields: item.fields.map((f) => ({
+              id:           f.id,
+              order:        f.order,
+              label:        f.label,
+              type:         f.type as "OK_NOK" | "SIM_NAO" | "NUMERIC" | "TEXT",
+              unit:         f.unit,
+              required:     f.required,
+              requirePhoto: f.requirePhoto,
+            })),
           })),
         }}
         canManage={canManage}
