@@ -22,7 +22,8 @@ export default async function ChecklistsPage() {
     orderBy: { createdAt: "desc" },
   })
 
-  const canManage = role === "ADMIN" || role === "GESTOR"
+  const canManage  = role === "ADMIN" || role === "GESTOR"
+  const canExecute = role !== "AUDITOR"
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -48,6 +49,7 @@ export default async function ChecklistsPage() {
           createdAt:   c.createdAt.toISOString(),
         }))}
         canManage={canManage}
+        canExecute={canExecute}
       />
     </div>
   )

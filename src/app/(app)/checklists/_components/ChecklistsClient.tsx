@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import {
   Plus, CheckSquare, ChevronRight, Pencil, Trash2,
-  CircleCheck, CircleDot, Search,
+  CircleCheck, CircleDot, Search, Play,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -24,12 +24,29 @@ interface Checklist {
 interface Props {
   initialChecklists: Checklist[]
   canManage:         boolean
+  canExecute:        boolean
 }
 
-export function ChecklistsClient({ initialChecklists, canManage }: Props) {
+export function ChecklistsClient({ initialChecklists, canManage, canExecute }: Props) {
   const router = useRouter()
 
-  const [checklists, setChecklists] = useState(initialChecklists)
+  const [checklists,   setChecklists]   = useState(initialChecklists)
+  const [startingId,   setStartingId]   = useState<number | null>(null)
+
+  async function handleExecutar(checklistId: number) {
+    setStartingId(checklistId)
+    try {
+      const res  = await fetch("/api/execucoes", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ checklistId }),
+      })
+      const json = await res.json()
+      if (res.ok) router.push(`/execucoes/${json.data.id}`)
+    } finally {
+      setStartingId(null)
+    }
+  }
   const [search,     setSearch]     = useState("")
   const [filter,     setFilter]     = useState<"all" | "active" | "inactive">("active")
 
@@ -232,6 +249,17 @@ export function ChecklistsClient({ initialChecklists, canManage }: Props) {
 
               {/* Ações */}
               <div className="flex items-center gap-1 flex-shrink-0">
+                {canExecute && c.active && (
+                  <button
+                    onClick={() => handleExecutar(c.id)}
+                    disabled={startingId === c.id}
+                    title="Executar"
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-soft text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-60"
+                  >
+                    <Play size={12} strokeWidth={2.5} />
+                    {startingId === c.id ? "..." : "Executar"}
+                  </button>
+                )}
                 {canManage && (
                   <>
                     <Link
