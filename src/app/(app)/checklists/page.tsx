@@ -13,14 +13,21 @@ export default async function ChecklistsPage() {
   const companyId = session.user.companyId as number
   const role      = session.user.role as string
 
-  const checklists = await prisma.checklist.findMany({
-    where:   { companyId, deletedAt: null },
-    include: {
-      _count:  { select: { items: { where: { deletedAt: null } } } },
-      creator: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  })
+  const [checklists, templates] = await Promise.all([
+    prisma.checklist.findMany({
+      where:   { companyId, isTemplate: false, deletedAt: null },
+      include: {
+        _count:  { select: { items: { where: { deletedAt: null } } } },
+        creator: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.checklist.findMany({
+      where:   { isTemplate: true, active: true, deletedAt: null },
+      include: { _count: { select: { items: { where: { deletedAt: null } } } } },
+      orderBy: { name: "asc" },
+    }),
+  ])
 
   const canManage  = role === "ADMIN" || role === "GESTOR"
   const canExecute = role !== "AUDITOR"
@@ -47,6 +54,13 @@ export default async function ChecklistsPage() {
           itemCount:   c._count.items,
           createdBy:   c.creator.name,
           createdAt:   c.createdAt.toISOString(),
+        }))}
+        availableTemplates={templates.map((t) => ({
+          id:             t.id,
+          name:           t.name,
+          description:    t.description,
+          templateSource: t.templateSource,
+          itemCount:      t._count.items,
         }))}
         canManage={canManage}
         canExecute={canExecute}

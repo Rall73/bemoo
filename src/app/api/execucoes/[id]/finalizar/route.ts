@@ -5,12 +5,13 @@ import { logAction } from "@/lib/audit"
 import { getIp } from "@/lib/audit"
 
 const zFieldValue = z.object({
-  fieldId:      z.number().int().positive(),
-  valueOkNok:   z.boolean().nullable().optional(),
-  valueNumeric: z.number().nullable().optional(),
-  valueText:    z.string().max(2000).nullable().optional(),
-  photoUrl:     z.string().url().nullable().optional(),
-  annotation:   z.string().max(2000).nullable().optional(),
+  fieldId:       z.number().int().positive(),
+  valueOkNok:    z.boolean().nullable().optional(),
+  valueNumeric:  z.number().nullable().optional(),
+  valueText:     z.string().max(2000).nullable().optional(),
+  valueNa:       z.boolean().optional(),
+  photoUrl:      z.string().url().nullable().optional(),
+  annotation:    z.string().max(2000).nullable().optional(),
   transcription: z.string().max(5000).nullable().optional(),
 })
 
@@ -34,8 +35,20 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
         include: {
           items: {
             where:   { deletedAt: null },
+            orderBy: { order: "asc" },
             include: {
-              fields: { where: { deletedAt: null } },
+              fields: {
+                where:   { deletedAt: null },
+                orderBy: { order: "asc" },
+                select:  {
+                  id:          true,
+                  label:       true,
+                  type:        true,
+                  required:    true,
+                  requirePhoto:true,
+                  allowNa:     true,
+                },
+              },
             },
           },
         },
@@ -62,6 +75,9 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
     if (!val) {
       return badRequest(`Campo obrigatório não preenchido: "${field.label}"`)
     }
+    // N/A satisfaz qualquer campo obrigatório (quando allowNa está habilitado)
+    if (val.valueNa && field.allowNa) continue
+
     if (field.type === "OK_NOK" || field.type === "SIM_NAO") {
       if (val.valueOkNok === null || val.valueOkNok === undefined) {
         return badRequest(`Campo obrigatório não preenchido: "${field.label}"`)
@@ -85,21 +101,23 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
       prisma.executionFieldValue.upsert({
         where:  { executionId_fieldId: { executionId: id, fieldId: fv.fieldId } },
         create: {
-          executionId:  id,
-          fieldId:      fv.fieldId,
-          valueOkNok:   fv.valueOkNok  ?? null,
-          valueNumeric: fv.valueNumeric != null ? fv.valueNumeric : null,
-          valueText:    fv.valueText    ?? null,
-          photoUrl:     fv.photoUrl     ?? null,
-          annotation:   fv.annotation   ?? null,
+          executionId:   id,
+          fieldId:       fv.fieldId,
+          valueOkNok:    fv.valueNa ? null : (fv.valueOkNok ?? null),
+          valueNumeric:  fv.valueNa ? null : (fv.valueNumeric != null ? fv.valueNumeric : null),
+          valueText:     fv.valueNa ? null : (fv.valueText ?? null),
+          valueNa:       fv.valueNa ?? false,
+          photoUrl:      fv.photoUrl     ?? null,
+          annotation:    fv.annotation   ?? null,
           transcription: fv.transcription ?? null,
         },
         update: {
-          valueOkNok:   fv.valueOkNok  ?? null,
-          valueNumeric: fv.valueNumeric != null ? fv.valueNumeric : null,
-          valueText:    fv.valueText    ?? null,
-          photoUrl:     fv.photoUrl     ?? null,
-          annotation:   fv.annotation   ?? null,
+          valueOkNok:    fv.valueNa ? null : (fv.valueOkNok ?? null),
+          valueNumeric:  fv.valueNa ? null : (fv.valueNumeric != null ? fv.valueNumeric : null),
+          valueText:     fv.valueNa ? null : (fv.valueText ?? null),
+          valueNa:       fv.valueNa ?? false,
+          photoUrl:      fv.photoUrl     ?? null,
+          annotation:    fv.annotation   ?? null,
           transcription: fv.transcription ?? null,
         },
       })

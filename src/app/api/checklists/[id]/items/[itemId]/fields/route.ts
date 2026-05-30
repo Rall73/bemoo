@@ -6,11 +6,14 @@ import {
 } from "@/lib/api"
 
 const zField = z.object({
-  label:        z.string().min(1, "Rótulo obrigatório").max(500),
-  type:         z.enum(["OK_NOK", "SIM_NAO", "NUMERIC", "TEXT"]).default("OK_NOK"),
-  unit:         z.string().max(20).optional().nullable(),
-  required:     z.boolean().default(true),
-  requirePhoto: z.boolean().default(false),
+  label:           z.string().min(1, "Rótulo obrigatório").max(500),
+  type:            z.enum(["OK_NOK", "SIM_NAO", "NUMERIC", "TEXT"]).default("OK_NOK"),
+  unit:            z.string().max(20).optional().nullable(),
+  required:        z.boolean().default(true),
+  requirePhoto:    z.boolean().default(false),
+  reference:       z.string().max(100).optional().nullable(),
+  referenceSource: z.string().max(200).optional().nullable(),
+  allowNa:         z.boolean().default(false),
 })
 
 // GET /api/checklists/[id]/items/[itemId]/fields — lista campos do item
@@ -65,12 +68,15 @@ export const POST = withAuthCtx<{ id: string; itemId: string }>(
     const field = await prisma.checklistItemField.create({
       data: {
         itemId,
-        label:        data.label,
-        type:         data.type,
-        unit:         data.unit ?? null,
-        required:     data.required,
-        requirePhoto: data.requirePhoto,
-        order:        (last?.order ?? 0) + 1,
+        label:           data.label,
+        type:            data.type,
+        unit:            data.unit ?? null,
+        required:        data.required,
+        requirePhoto:    data.requirePhoto,
+        reference:       data.reference ?? null,
+        referenceSource: data.referenceSource ?? null,
+        allowNa:         data.allowNa,
+        order:           (last?.order ?? 0) + 1,
       },
     })
 

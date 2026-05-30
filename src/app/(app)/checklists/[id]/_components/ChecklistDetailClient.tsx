@@ -14,13 +14,16 @@ import { cn } from "@/lib/utils"
 type FieldType = "OK_NOK" | "SIM_NAO" | "NUMERIC" | "TEXT"
 
 interface Field {
-  id:           number
-  order:        number
-  label:        string
-  type:         FieldType
-  unit:         string | null
-  required:     boolean
-  requirePhoto: boolean
+  id:              number
+  order:           number
+  label:           string
+  type:            FieldType
+  unit:            string | null
+  required:        boolean
+  requirePhoto:    boolean
+  reference:       string | null
+  referenceSource: string | null
+  allowNa:         boolean
 }
 
 interface Item {
@@ -146,12 +149,15 @@ export function ChecklistDetailClient({
   const [addingFieldForItem, setAddingFieldForItem] = useState<number | null>(null)
   const [newField, setNewField] = useState<{
     label: string; type: FieldType; unit: string; required: boolean; requirePhoto: boolean
-  }>({ label: "", type: "OK_NOK", unit: "", required: true, requirePhoto: false })
+    reference: string; referenceSource: string; allowNa: boolean
+  }>({ label: "", type: "OK_NOK", unit: "", required: true, requirePhoto: false,
+       reference: "", referenceSource: "", allowNa: false })
   const [savingField, setSavingField] = useState(false)
 
   function openAddField(itemId: number) {
     setAddingFieldForItem(itemId)
-    setNewField({ label: "", type: "OK_NOK", unit: "", required: true, requirePhoto: false })
+    setNewField({ label: "", type: "OK_NOK", unit: "", required: true, requirePhoto: false,
+                  reference: "", referenceSource: "", allowNa: false })
   }
 
   async function addField(e: React.FormEvent, itemId: number) {
@@ -161,11 +167,14 @@ export function ChecklistDetailClient({
     const res  = await fetch(`/api/checklists/${initial.id}/items/${itemId}/fields`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body:   JSON.stringify({
-        label:        newField.label,
-        type:         newField.type,
-        unit:         newField.unit || null,
-        required:     newField.required,
-        requirePhoto: newField.requirePhoto,
+        label:           newField.label,
+        type:            newField.type,
+        unit:            newField.unit || null,
+        required:        newField.required,
+        requirePhoto:    newField.requirePhoto,
+        reference:       newField.reference   || null,
+        referenceSource: newField.referenceSource || null,
+        allowNa:         newField.allowNa,
       }),
     })
     const json = await res.json()
@@ -209,14 +218,22 @@ export function ChecklistDetailClient({
   const [editingFieldId, setEditingFieldId] = useState<number | null>(null)
   const [editField, setEditField] = useState<{
     label: string; type: FieldType; unit: string; required: boolean; requirePhoto: boolean
-  }>({ label: "", type: "OK_NOK", unit: "", required: true, requirePhoto: false })
+    reference: string; referenceSource: string; allowNa: boolean
+  }>({ label: "", type: "OK_NOK", unit: "", required: true, requirePhoto: false,
+       reference: "", referenceSource: "", allowNa: false })
   const [savingEditField, setSavingEditField] = useState(false)
 
   function startEditField(field: Field) {
     setEditingFieldId(field.id)
     setEditField({
-      label: field.label, type: field.type,
-      unit: field.unit ?? "", required: field.required, requirePhoto: field.requirePhoto,
+      label:           field.label,
+      type:            field.type,
+      unit:            field.unit ?? "",
+      required:        field.required,
+      requirePhoto:    field.requirePhoto,
+      reference:       field.reference       ?? "",
+      referenceSource: field.referenceSource ?? "",
+      allowNa:         field.allowNa,
     })
   }
 
@@ -226,8 +243,14 @@ export function ChecklistDetailClient({
     const res  = await fetch(`/api/checklists/${initial.id}/items/${itemId}/fields/${fieldId}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body:   JSON.stringify({
-        label: editField.label, type: editField.type,
-        unit: editField.unit || null, required: editField.required, requirePhoto: editField.requirePhoto,
+        label:           editField.label,
+        type:            editField.type,
+        unit:            editField.unit || null,
+        required:        editField.required,
+        requirePhoto:    editField.requirePhoto,
+        reference:       editField.reference       || null,
+        referenceSource: editField.referenceSource || null,
+        allowNa:         editField.allowNa,
       }),
     })
     const json = await res.json()
@@ -449,7 +472,7 @@ export function ChecklistDetailClient({
 
                           <span className="flex-1 text-sm text-gray-700">{field.label}</span>
 
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                             <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium", FIELD_TYPE_COLORS[field.type])}>
                               {FIELD_TYPE_LABELS[field.type]}
                               {field.type === "NUMERIC" && field.unit ? ` (${field.unit})` : ""}
@@ -457,8 +480,16 @@ export function ChecklistDetailClient({
                             {!field.required && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Opcional</span>
                             )}
+                            {field.allowNa && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">N/A</span>
+                            )}
                             {field.requirePhoto && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700">📷 Foto</span>
+                            )}
+                            {field.reference && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-mono">
+                                {field.referenceSource ? `${field.referenceSource} ` : ""}{field.reference}
+                              </span>
                             )}
                           </div>
 
@@ -528,11 +559,19 @@ function FieldForm({
   values,
   onChange,
 }: {
-  values:   { label: string; type: FieldType; unit: string; required: boolean; requirePhoto: boolean }
+  values: {
+    label: string; type: FieldType; unit: string; required: boolean; requirePhoto: boolean
+    reference: string; referenceSource: string; allowNa: boolean
+  }
   onChange: (v: typeof values) => void
 }) {
+  const [showRef, setShowRef] = useState(
+    !!(values.reference || values.referenceSource)
+  )
+
   return (
     <div className="space-y-2">
+      {/* Nome + Tipo + Unidade */}
       <div className="flex gap-2 flex-wrap">
         <div className="flex-1 min-w-[160px]">
           <input
@@ -566,26 +605,54 @@ function FieldForm({
         )}
       </div>
 
+      {/* Flags */}
       <div className="flex items-center gap-4 flex-wrap">
         <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600 select-none">
-          <input
-            type="checkbox"
-            checked={values.required}
+          <input type="checkbox" checked={values.required}
             onChange={(e) => onChange({ ...values, required: e.target.checked })}
-            className="w-3.5 h-3.5 rounded accent-primary"
-          />
+            className="w-3.5 h-3.5 rounded accent-primary" />
           Obrigatório
         </label>
         <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600 select-none">
-          <input
-            type="checkbox"
-            checked={values.requirePhoto}
+          <input type="checkbox" checked={values.requirePhoto}
             onChange={(e) => onChange({ ...values, requirePhoto: e.target.checked })}
-            className="w-3.5 h-3.5 rounded accent-primary"
-          />
+            className="w-3.5 h-3.5 rounded accent-primary" />
           Exige foto
         </label>
+        {(values.type === "OK_NOK" || values.type === "SIM_NAO") && (
+          <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600 select-none">
+            <input type="checkbox" checked={values.allowNa}
+              onChange={(e) => onChange({ ...values, allowNa: e.target.checked })}
+              className="w-3.5 h-3.5 rounded accent-primary" />
+            Permite N/A
+          </label>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowRef((v) => !v)}
+          className="text-xs text-primary hover:underline"
+        >
+          {showRef ? "— Ocultar referência" : "+ Referência normativa"}
+        </button>
       </div>
+
+      {/* Referência normativa */}
+      {showRef && (
+        <div className="flex gap-2 flex-wrap border-t border-gray-100 pt-2 mt-1">
+          <input
+            value={values.referenceSource}
+            onChange={(e) => onChange({ ...values, referenceSource: e.target.value })}
+            placeholder="Fonte (ex.: ISO 9001:2015, NR-12...)"
+            className="flex-1 min-w-[140px] px-3 py-2 text-sm text-gray-800 bg-white border border-gray-200 rounded-soft focus:outline-none focus:border-primary"
+          />
+          <input
+            value={values.reference}
+            onChange={(e) => onChange({ ...values, reference: e.target.value })}
+            placeholder="Cláusula (ex.: 5.1.1)"
+            className="w-36 px-3 py-2 text-sm text-gray-800 bg-white border border-gray-200 rounded-soft focus:outline-none focus:border-primary"
+          />
+        </div>
+      )}
     </div>
   )
 }

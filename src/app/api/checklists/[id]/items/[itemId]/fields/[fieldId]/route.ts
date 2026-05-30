@@ -6,12 +6,15 @@ import {
 } from "@/lib/api"
 
 const zUpdate = z.object({
-  label:        z.string().min(1).max(500).optional(),
-  type:         z.enum(["OK_NOK", "SIM_NAO", "NUMERIC", "TEXT"]).optional(),
-  unit:         z.string().max(20).nullable().optional(),
-  required:     z.boolean().optional(),
-  requirePhoto: z.boolean().optional(),
-  order:        z.number().int().optional(),
+  label:           z.string().min(1).max(500).optional(),
+  type:            z.enum(["OK_NOK", "SIM_NAO", "NUMERIC", "TEXT"]).optional(),
+  unit:            z.string().max(20).nullable().optional(),
+  required:        z.boolean().optional(),
+  requirePhoto:    z.boolean().optional(),
+  reference:       z.string().max(100).nullable().optional(),
+  referenceSource: z.string().max(200).nullable().optional(),
+  allowNa:         z.boolean().optional(),
+  order:           z.number().int().optional(),
 })
 
 async function resolveField(
@@ -54,12 +57,15 @@ export const PATCH = withAuthCtx<{ id: string; itemId: string; fieldId: string }
     const updated = await prisma.checklistItemField.update({
       where: { id: field.id },
       data: {
-        ...(data.label        !== undefined && { label:        data.label }),
-        ...(data.type         !== undefined && { type:         data.type }),
-        ...(data.unit         !== undefined && { unit:         data.unit }),
-        ...(data.required     !== undefined && { required:     data.required }),
-        ...(data.requirePhoto !== undefined && { requirePhoto: data.requirePhoto }),
-        ...(data.order        !== undefined && { order:        data.order }),
+        ...(data.label           !== undefined && { label:           data.label }),
+        ...(data.type            !== undefined && { type:            data.type }),
+        ...(data.unit            !== undefined && { unit:            data.unit }),
+        ...(data.required        !== undefined && { required:        data.required }),
+        ...(data.requirePhoto    !== undefined && { requirePhoto:    data.requirePhoto }),
+        ...(data.reference       !== undefined && { reference:       data.reference }),
+        ...(data.referenceSource !== undefined && { referenceSource: data.referenceSource }),
+        ...(data.allowNa         !== undefined && { allowNa:         data.allowNa }),
+        ...(data.order           !== undefined && { order:           data.order }),
       },
     })
 

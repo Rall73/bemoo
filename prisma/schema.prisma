@@ -171,18 +171,20 @@ enum ExecutionStatus {
 }
 
 model Checklist {
-  id          Int       @id @default(autoincrement())
-  companyId   Int       @map("company_id")
-  name        String    @db.VarChar(200)
-  description String?   @db.Text
-  active      Boolean   @default(true)
-  createdBy   Int       @map("created_by")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
-  deletedBy   Int?      @map("deleted_by")
+  id             Int       @id @default(autoincrement())
+  companyId      Int?      @map("company_id")        // null = template de plataforma
+  name           String    @db.VarChar(200)
+  description    String?   @db.Text
+  active         Boolean   @default(true)
+  isTemplate     Boolean   @default(false) @map("is_template")
+  templateSource String?   @db.VarChar(200)          @map("template_source")
+  createdBy      Int       @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+  deletedBy      Int?      @map("deleted_by")
 
-  company    Company              @relation(fields: [companyId], references: [id])
+  company    Company?             @relation(fields: [companyId], references: [id])
   creator    User                 @relation("ChecklistCreator", fields: [createdBy], references: [id])
   items      ChecklistItem[]
   executions ChecklistExecution[]
@@ -210,16 +212,20 @@ model ChecklistItem {
 
 // Campo de medição dentro de um item (ex.: "Temperatura", "Prateleiras limpas")
 model ChecklistItemField {
-  id           Int       @id @default(autoincrement())
-  itemId       Int       @map("item_id")
-  order        Int       @default(0)
-  label        String    @db.VarChar(500)
-  type         FieldType @default(OK_NOK)
-  unit         String?   @db.VarChar(20)   // ex.: °C, kg, %
-  required     Boolean   @default(true)
-  requirePhoto Boolean   @default(false)   @map("require_photo")
-  deletedAt    DateTime? @map("deleted_at")
-  deletedBy    Int?      @map("deleted_by")
+  id              Int       @id @default(autoincrement())
+  itemId          Int       @map("item_id")
+  order           Int       @default(0)
+  label           String    @db.VarChar(500)
+  description     String?   @db.Text            // instrução/evidência esperada (exibida durante execução)
+  type            FieldType @default(OK_NOK)
+  unit            String?   @db.VarChar(20)    // ex.: °C, kg, %
+  required        Boolean   @default(true)
+  requirePhoto    Boolean   @default(false)    @map("require_photo")
+  reference       String?   @db.VarChar(100)   // ex.: "5.1.1"
+  referenceSource String?   @db.VarChar(200)   @map("reference_source") // ex.: "ISO 9001:2015"
+  allowNa         Boolean   @default(false)    @map("allow_na")         // habilita opção N/A
+  deletedAt       DateTime? @map("deleted_at")
+  deletedBy       Int?      @map("deleted_by")
 
   item        ChecklistItem        @relation(fields: [itemId], references: [id])
   fieldValues ExecutionFieldValue[]
@@ -255,17 +261,18 @@ model ChecklistExecution {
 
 // Resposta de um campo em uma execução
 model ExecutionFieldValue {
-  id           Int       @id @default(autoincrement())
-  executionId  Int       @map("execution_id")
-  fieldId      Int       @map("field_id")
-  valueOkNok   Boolean?  @map("value_ok_nok")
-  valueNumeric Decimal?  @db.Decimal(10, 2) @map("value_numeric")
-  valueText    String?   @db.Text @map("value_text")
-  photoUrl     String?   @db.VarChar(500) @map("photo_url")
-  annotation   String?   @db.Text
-  transcription String?  @db.Text
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id            Int       @id @default(autoincrement())
+  executionId   Int       @map("execution_id")
+  fieldId       Int       @map("field_id")
+  valueOkNok    Boolean?  @map("value_ok_nok")
+  valueNumeric  Decimal?  @db.Decimal(10, 2) @map("value_numeric")
+  valueText     String?   @db.Text @map("value_text")
+  valueNa       Boolean   @default(false) @map("value_na")  // campo marcado como N/A
+  photoUrl      String?   @db.VarChar(500) @map("photo_url")
+  annotation    String?   @db.Text
+  transcription String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   execution ChecklistExecution @relation(fields: [executionId], references: [id])
   field     ChecklistItemField @relation(fields: [fieldId], references: [id])

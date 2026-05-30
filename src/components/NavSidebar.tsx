@@ -8,7 +8,7 @@ import { MODULES_CONFIG } from "@/lib/modules"
 import {
   CheckSquare, AlertTriangle, Tag, Target, Inbox,
   LayoutDashboard, LogOut, ChevronRight, Users,
-  Building2, BarChart2, ScrollText, UserCircle, X,
+  Building2, BarChart2, ScrollText, UserCircle, X, Layers,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -98,10 +98,11 @@ export function NavSidebar({ user, enabledModules, onClose }: NavSidebarProps) {
             <p className="px-3 pt-4 pb-1 text-[10px] font-medium uppercase tracking-widest text-gray-400">
               Plataforma
             </p>
-            <NavLink href="/plataforma/empresas" icon={Building2}  label="Empresas" current={pathname} onClick={handleLinkClick} />
-            <NavLink href="/plataforma/usuarios" icon={Users}      label="Usuários"  current={pathname} onClick={handleLinkClick} />
-            <NavLink href="/plataforma/metricas" icon={BarChart2}  label="Métricas"  current={pathname} onClick={handleLinkClick} />
-            <NavLink href="/plataforma/logs"     icon={ScrollText} label="Logs"      current={pathname} onClick={handleLinkClick} />
+            <NavLink href="/plataforma/empresas"  icon={Building2}  label="Empresas"  current={pathname} onClick={handleLinkClick} />
+            <NavLink href="/plataforma/usuarios"  icon={Users}      label="Usuários"  current={pathname} onClick={handleLinkClick} />
+            <NavLink href="/plataforma/metricas"  icon={BarChart2}  label="Métricas"  current={pathname} onClick={handleLinkClick} />
+            <NavLink href="/plataforma/logs"      icon={ScrollText} label="Logs"      current={pathname} onClick={handleLinkClick} />
+            <NavLink href="/plataforma/templates" icon={Layers}     label="Templates" current={pathname} onClick={handleLinkClick} />
           </>
         )}
       </nav>

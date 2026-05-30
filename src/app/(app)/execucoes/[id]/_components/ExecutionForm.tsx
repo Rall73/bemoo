@@ -6,19 +6,23 @@ import Link from "next/link"
 import {
   ArrowLeft, CheckCircle, XCircle, Camera, X,
   Loader2, ChevronDown, ChevronUp, MessageSquare,
-  Mic, MicOff, Square,
+  Mic, Square, MinusCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type FieldType = "OK_NOK" | "SIM_NAO" | "NUMERIC" | "TEXT"
 
 interface Field {
-  id:           number
-  label:        string
-  type:         FieldType
-  unit:         string | null
-  required:     boolean
-  requirePhoto: boolean
+  id:              number
+  label:           string
+  description:     string | null
+  type:            FieldType
+  unit:            string | null
+  required:        boolean
+  requirePhoto:    boolean
+  allowNa:         boolean
+  reference:       string | null
+  referenceSource: string | null
 }
 
 interface Item {
@@ -28,11 +32,12 @@ interface Item {
 }
 
 interface FieldValue {
-  valueOkNok:   boolean | null | undefined
-  valueNumeric: number | null | undefined
-  valueText:    string | null | undefined
-  photoUrl:     string | null | undefined
-  annotation:   string | null | undefined
+  valueOkNok:    boolean | null | undefined
+  valueNumeric:  number | null | undefined
+  valueText:     string | null | undefined
+  valueNa:       boolean | undefined
+  photoUrl:      string | null | undefined
+  annotation:    string | null | undefined
   transcription: string | null | undefined
 }
 
@@ -204,6 +209,7 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
   const required     = allFields.filter((f) => f.required)
   const filledReq    = required.filter((f) => {
     const v = getVal(f.id)
+    if (v.valueNa && f.allowNa) return true   // N/A satisfaz o campo
     if (f.type === "OK_NOK" || f.type === "SIM_NAO") return v.valueOkNok !== null && v.valueOkNok !== undefined
     if (f.type === "NUMERIC") return v.valueNumeric !== null && v.valueNumeric !== undefined
     if (f.type === "TEXT") return !!v.valueText?.trim()
@@ -227,6 +233,7 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
     // Validação frontend
     for (const field of required) {
       const v = getVal(field.id)
+      if (v.valueNa && field.allowNa) continue  // N/A satisfaz o campo
       if (field.type === "OK_NOK" || field.type === "SIM_NAO") {
         if (v.valueOkNok === null || v.valueOkNok === undefined) {
           setSaveError(`Obrigatório: "${field.label}"`)
@@ -251,13 +258,15 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
     try {
       const fieldValues = allFields.map((f) => {
         const v = getVal(f.id)
+        const isNa = !!(v.valueNa && f.allowNa)
         return {
-          fieldId:      f.id,
-          valueOkNok:   (f.type === "OK_NOK" || f.type === "SIM_NAO") ? (v.valueOkNok ?? null) : null,
-          valueNumeric: f.type === "NUMERIC" ? (v.valueNumeric ?? null) : null,
-          valueText:    f.type === "TEXT" ? (v.valueText ?? null) : null,
-          photoUrl:     photoUrls[String(f.id)] ?? null,   // ← usa photoUrls separado
-          annotation:   v.annotation ?? null,
+          fieldId:       f.id,
+          valueNa:       isNa,
+          valueOkNok:    isNa ? null : ((f.type === "OK_NOK" || f.type === "SIM_NAO") ? (v.valueOkNok ?? null) : null),
+          valueNumeric:  isNa ? null : (f.type === "NUMERIC" ? (v.valueNumeric ?? null) : null),
+          valueText:     isNa ? null : (f.type === "TEXT" ? (v.valueText ?? null) : null),
+          photoUrl:      photoUrls[String(f.id)] ?? null,
+          annotation:    v.annotation    ?? null,
           transcription: v.transcription ?? null,
         }
       })
@@ -331,6 +340,7 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
         const itemFilled  = itemFields.filter((f) => {
           if (!f.required) return true
           const v = getVal(f.id)
+          if (v.valueNa && f.allowNa) return true
           if (f.type === "OK_NOK" || f.type === "SIM_NAO") return v.valueOkNok !== null && v.valueOkNok !== undefined
           if (f.type === "NUMERIC") return v.valueNumeric !== null && v.valueNumeric !== undefined
           if (f.type === "TEXT") return !!v.valueText?.trim()
@@ -369,16 +379,28 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
                   return (
                     <div key={field.id} className="px-4 py-4 space-y-3">
                       {/* Label */}
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-medium text-gray-800 flex-1">
-                          {field.label}
-                          {field.required && <span className="text-error ml-0.5">*</span>}
-                          {field.requirePhoto && (
-                            <span className="ml-1.5 text-[10px] bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded">📷 obrigatória</span>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium text-gray-800 flex-1">
+                            {field.label}
+                            {field.required && <span className="text-error ml-0.5">*</span>}
+                            {field.requirePhoto && (
+                              <span className="ml-1.5 text-[10px] bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded">📷 obrigatória</span>
+                            )}
+                          </p>
+                          {field.type === "NUMERIC" && field.unit && (
+                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{field.unit}</span>
                           )}
-                        </p>
-                        {field.type === "NUMERIC" && field.unit && (
-                          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{field.unit}</span>
+                        </div>
+                        {field.reference && (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono">
+                            {field.referenceSource && <>{field.referenceSource} · </>}{field.reference}
+                          </span>
+                        )}
+                        {field.description && (
+                          <p className="text-[11px] text-gray-400 italic leading-snug">
+                            💡 {field.description}
+                          </p>
                         )}
                       </div>
 
@@ -387,10 +409,10 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => setVal(field.id, { valueOkNok: true })}
+                            onClick={() => setVal(field.id, { valueOkNok: true, valueNa: false })}
                             className={cn(
                               "flex-1 flex items-center justify-center gap-2 py-3.5 rounded-soft text-sm font-semibold border-2 transition-all",
-                              val.valueOkNok === true
+                              val.valueOkNok === true && !val.valueNa
                                 ? "bg-success text-white border-success shadow-sm"
                                 : "bg-white text-gray-400 border-gray-200 hover:border-success hover:text-success"
                             )}
@@ -400,10 +422,10 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setVal(field.id, { valueOkNok: false })}
+                            onClick={() => setVal(field.id, { valueOkNok: false, valueNa: false })}
                             className={cn(
                               "flex-1 flex items-center justify-center gap-2 py-3.5 rounded-soft text-sm font-semibold border-2 transition-all",
-                              val.valueOkNok === false
+                              val.valueOkNok === false && !val.valueNa
                                 ? "bg-error text-white border-error shadow-sm"
                                 : "bg-white text-gray-400 border-gray-200 hover:border-error hover:text-error"
                             )}
@@ -411,6 +433,22 @@ export function ExecutionForm({ execution }: { execution: ExecutionData }) {
                             <XCircle size={18} strokeWidth={2.5} />
                             {field.type === "OK_NOK" ? "NOK" : "Não"}
                           </button>
+                          {field.allowNa && (
+                            <button
+                              type="button"
+                              onClick={() => setVal(field.id, { valueOkNok: null, valueNa: true })}
+                              className={cn(
+                                "flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-soft text-sm font-semibold border-2 transition-all",
+                                val.valueNa
+                                  ? "bg-gray-400 text-white border-gray-400 shadow-sm"
+                                  : "bg-white text-gray-400 border-gray-200 hover:border-gray-400 hover:text-gray-600"
+                              )}
+                              title="Não aplicável"
+                            >
+                              <MinusCircle size={18} strokeWidth={2.5} />
+                              N/A
+                            </button>
+                          )}
                         </div>
                       )}
 

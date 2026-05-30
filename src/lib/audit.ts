@@ -31,6 +31,7 @@ export type AuditAction =
   | "senha.reset_concluido"
   // Checklists
   | "checklist.executado"
+  | "checklist.importado_template"
 
 // ─── Helper principal ─────────────────────────────────────────────────
 

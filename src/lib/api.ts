@@ -90,9 +90,10 @@ export function validateParams<T extends z.ZodTypeAny>(
  */
 export function assertSameCompany(
   sessionCompanyId: number,
-  resourceCompanyId: number
+  resourceCompanyId: number | null
 ): NextResponse | null {
-  if (sessionCompanyId !== resourceCompanyId) {
+  // companyId null = template de plataforma, inacessível via APIs regulares
+  if (resourceCompanyId === null || sessionCompanyId !== resourceCompanyId) {
     return forbidden("Você não tem acesso a este recurso.")
   }
   return null
