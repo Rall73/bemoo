@@ -244,6 +244,7 @@ model ChecklistExecution {
   finishedAt        DateTime?       @map("finished_at")
   conclusionNote    String?         @db.Text @map("conclusion_note")
   reportUrl         String?         @db.VarChar(500) @map("report_url")
+  reportIaUrl       String?         @db.VarChar(500) @map("report_ia_url")
   reportGeneratedAt DateTime?       @map("report_generated_at")
   deletedAt         DateTime?       @map("deleted_at")
   deletedBy         Int?            @map("deleted_by")

@@ -13,6 +13,7 @@ export interface ReportFieldValue {
   valueOkNok:    boolean | null
   valueNumeric:  number  | null
   valueText:     string  | null
+  valueNa?:      boolean | null
   photoUrl:      string  | null
   annotation:    string  | null
   transcription: string  | null
@@ -58,6 +59,7 @@ const COLORS = {
 function resposta(field: ReportField): { text: string; color: string } {
   const v = field.value
   if (!v) return { text: "—", color: COLORS.gray }
+  if (v.valueNa) return { text: "N/A", color: COLORS.gray }
   if (field.type === "OK_NOK") {
     if (v.valueOkNok === true)  return { text: "✓ OK",  color: COLORS.okGreen }
     if (v.valueOkNok === false) return { text: "✗ NOK", color: COLORS.nokRed }

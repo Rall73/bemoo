@@ -3,21 +3,35 @@
 import { useState } from "react"
 import {
   FileText, Sparkles, Download, Loader2,
-  Pencil, RefreshCw, ChevronDown, ChevronUp,
+  Pencil, RefreshCw, ChevronDown, ChevronUp, Clock,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Props {
-  executionId: number
+  executionId:   number
+  savedBasicUrl: string | null
+  savedIaUrl:    string | null
+  savedAt:       string | null
 }
 
-export function RelatorioPanel({ executionId }: Props) {
+function fmtSavedAt(iso: string | null) {
+  if (!iso) return null
+  return new Date(iso).toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  })
+}
+
+export function RelatorioPanel({ executionId, savedBasicUrl, savedIaUrl, savedAt }: Props) {
+
   // ─── Relatório Básico ─────────────────────────────────────────────────
-  const [basicLoading, setBasicLoading] = useState(false)
-  const [basicUrl,     setBasicUrl]     = useState<string | null>(null)
-  const [basicError,   setBasicError]   = useState("")
+  const [basicLoading,    setBasicLoading]    = useState(false)
+  const [basicUrl,        setBasicUrl]        = useState<string | null>(savedBasicUrl)
+  const [basicError,      setBasicError]      = useState("")
+  const [basicGenerating, setBasicGenerating] = useState(false)
 
   async function gerarBasico() {
+    setBasicGenerating(true)
     setBasicLoading(true)
     setBasicError("")
     try {
@@ -27,29 +41,31 @@ export function RelatorioPanel({ executionId }: Props) {
         body:    JSON.stringify({ tipo: "basico" }),
       })
       const json = await res.json()
-      if (res.ok) setBasicUrl(json.data.url)
-      else setBasicError(json.message ?? "Erro ao gerar relatório.")
+      if (res.ok) {
+        setBasicUrl(json.data.url)
+      } else {
+        setBasicError(json.message ?? "Erro ao gerar relatório.")
+      }
     } catch {
       setBasicError("Erro de conexão.")
     } finally {
       setBasicLoading(false)
+      setBasicGenerating(false)
     }
   }
 
   // ─── Relatório com IA ─────────────────────────────────────────────────
-  const [iaStep,      setIaStep]      = useState<"idle" | "analyzing" | "review" | "generating" | "done">("idle")
-  const [analise,     setAnalise]     = useState("")
-  const [iaUrl,       setIaUrl]       = useState<string | null>(null)
-  const [iaError,     setIaError]     = useState("")
-  const [showIa,      setShowIa]      = useState(false)
+  const [iaStep,    setIaStep]    = useState<"idle" | "analyzing" | "review" | "generating" | "done">("idle")
+  const [analise,   setAnalise]   = useState("")
+  const [iaUrl,     setIaUrl]     = useState<string | null>(savedIaUrl)
+  const [iaError,   setIaError]   = useState("")
+  const [showIa,    setShowIa]    = useState(false)
 
   async function gerarAnalise() {
     setIaStep("analyzing")
     setIaError("")
     try {
-      const res  = await fetch(`/api/execucoes/${executionId}/relatorio/analise`, {
-        method: "POST",
-      })
+      const res  = await fetch(`/api/execucoes/${executionId}/relatorio/analise`, { method: "POST" })
       const json = await res.json()
       if (res.ok) {
         setAnalise(json.data.analise)
@@ -87,6 +103,8 @@ export function RelatorioPanel({ executionId }: Props) {
     }
   }
 
+  const savedAtFormatted = fmtSavedAt(savedAt)
+
   return (
     <div className="bg-white border border-gray-200 rounded-round p-5 space-y-4">
       <h2 className="text-sm font-semibold text-gray-700">Relatórios</h2>
@@ -102,35 +120,44 @@ export function RelatorioPanel({ executionId }: Props) {
             </div>
           </div>
 
-          {basicUrl ? (
-            <a
-              href={basicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-soft hover:bg-primary/90 transition-colors flex-shrink-0"
-            >
-              <Download size={13} strokeWidth={2.5} /> Baixar .docx
-            </a>
-          ) : (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {basicUrl && (
+              <a
+                href={basicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-soft hover:bg-primary/90 transition-colors"
+              >
+                <Download size={13} strokeWidth={2.5} /> Baixar .docx
+              </a>
+            )}
             <button
               onClick={gerarBasico}
               disabled={basicLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-primary text-primary text-xs font-medium rounded-soft hover:bg-primary-50 transition-colors flex-shrink-0 disabled:opacity-60"
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium rounded-soft transition-colors disabled:opacity-60",
+                basicUrl
+                  ? "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  : "border-primary text-primary hover:bg-primary-50"
+              )}
             >
-              {basicLoading ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} strokeWidth={2} />}
-              {basicLoading ? "Gerando..." : "Gerar .docx"}
+              {basicLoading
+                ? <><Loader2 size={13} className="animate-spin" /> Gerando...</>
+                : basicUrl
+                  ? <><RefreshCw size={13} strokeWidth={2} /> Regenerar</>
+                  : <><FileText size={13} strokeWidth={2} /> Gerar .docx</>
+              }
             </button>
-          )}
+          </div>
         </div>
-        {basicError && <p className="text-xs text-error bg-red-50 px-3 py-2 rounded-soft">{basicError}</p>}
-        {basicUrl && (
-          <button
-            onClick={() => { setBasicUrl(null); gerarBasico() }}
-            className="text-xs text-gray-400 hover:text-primary flex items-center gap-1"
-          >
-            <RefreshCw size={11} /> Regenerar
-          </button>
+
+        {/* Data do último relatório salvo */}
+        {basicUrl && savedAtFormatted && (
+          <p className="text-[11px] text-gray-400 flex items-center gap-1 pl-6">
+            <Clock size={10} /> Gerado em {savedAtFormatted}
+          </p>
         )}
+        {basicError && <p className="text-xs text-error bg-red-50 px-3 py-2 rounded-soft">{basicError}</p>}
       </div>
 
       <div className="border-t border-gray-100" />
@@ -145,7 +172,9 @@ export function RelatorioPanel({ executionId }: Props) {
             <Sparkles size={16} className="text-accent flex-shrink-0" strokeWidth={2} />
             <div className="text-left">
               <p className="text-sm font-medium text-gray-800">Relatório com Análise por IA</p>
-              <p className="text-xs text-gray-500">Inclui diagnóstico, pontos positivos/negativos e recomendações</p>
+              <p className="text-xs text-gray-500">
+                {iaUrl ? "Disponível · clique para baixar ou regenerar" : "Inclui diagnóstico, pontos e recomendações"}
+              </p>
             </div>
           </div>
           {showIa
@@ -156,8 +185,28 @@ export function RelatorioPanel({ executionId }: Props) {
 
         {showIa && (
           <div className="space-y-3 pl-6">
-            {/* Idle: botão para iniciar análise */}
-            {iaStep === "idle" && (
+            {/* Relatório IA já salvo */}
+            {iaUrl && iaStep === "idle" && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href={iaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white text-xs font-medium rounded-soft hover:bg-accent/90 transition-colors"
+                >
+                  <Download size={13} strokeWidth={2.5} /> Baixar .docx (IA)
+                </a>
+                <button
+                  onClick={gerarAnalise}
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-accent px-2"
+                >
+                  <RefreshCw size={11} /> Regenerar
+                </button>
+              </div>
+            )}
+
+            {/* Idle sem relatório salvo */}
+            {!iaUrl && iaStep === "idle" && (
               <button
                 onClick={gerarAnalise}
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-accent text-accent text-xs font-medium rounded-soft hover:bg-accent/5 transition-colors"
@@ -202,7 +251,7 @@ export function RelatorioPanel({ executionId }: Props) {
                     onClick={() => { setIaStep("idle"); setAnalise("") }}
                     className="text-xs text-gray-400 hover:text-gray-600 px-2"
                   >
-                    Recomeçar
+                    Cancelar
                   </button>
                 </div>
               </div>
@@ -210,20 +259,20 @@ export function RelatorioPanel({ executionId }: Props) {
 
             {/* Concluído */}
             {iaStep === "done" && iaUrl && (
-              <div className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <a
                   href={iaUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white text-xs font-medium rounded-soft hover:bg-accent/90 transition-colors"
                 >
-                  <Download size={13} strokeWidth={2.5} /> Baixar relatório com IA (.docx)
+                  <Download size={13} strokeWidth={2.5} /> Baixar .docx (IA)
                 </a>
                 <button
                   onClick={() => { setIaStep("review") }}
-                  className="text-xs text-gray-400 hover:text-primary flex items-center gap-1 block"
+                  className="text-xs text-gray-400 hover:text-primary flex items-center gap-1"
                 >
-                  <RefreshCw size={11} /> Editar análise e regenerar
+                  <RefreshCw size={11} /> Editar e regenerar
                 </button>
               </div>
             )}

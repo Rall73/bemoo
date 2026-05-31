@@ -238,7 +238,12 @@ export default async function ResultadoPage({
       ))}
 
       {/* ── Relatórios ────────────────────────────────────────────── */}
-      <RelatorioPanel executionId={execId} />
+      <RelatorioPanel
+        executionId={execId}
+        savedBasicUrl={execution.reportUrl ?? null}
+        savedIaUrl={execution.reportIaUrl ?? null}
+        savedAt={execution.reportGeneratedAt?.toISOString() ?? null}
+      />
 
       {/* ── Ações ─────────────────────────────────────────────────── */}
       <div className="flex gap-3">

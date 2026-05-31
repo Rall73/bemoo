@@ -15,6 +15,13 @@ const zBody = z.object({
   analise: z.string().optional(),   // obrigatório quando tipo = "ia"
 })
 
+// Monta URL de download com fl_attachment para garantir extensão .docx no download
+function withDownloadFlag(url: string, filename: string): string {
+  // Insere fl_attachment:filename após /upload/
+  const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "_")
+  return url.replace("/upload/", `/upload/fl_attachment:${safe}/`)
+}
+
 // POST /api/execucoes/[id]/relatorio
 export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => {
   const execId = parseInt(params.id)
@@ -73,6 +80,7 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
             valueOkNok:    fv.valueOkNok,
             valueNumeric:  fv.valueNumeric != null ? Number(fv.valueNumeric) : null,
             valueText:     fv.valueText,
+            valueNa:       fv.valueNa,
             photoUrl:      fv.photoUrl,
             annotation:    fv.annotation,
             transcription: fv.transcription,
@@ -86,10 +94,17 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
     // ── Gera DOCX ────────────────────────────────────────────────────────
     const buffer = await gerarRelatorioDocx(reportData, data.tipo === "ia" ? data.analise : undefined)
 
+    // ── Nome do arquivo ──────────────────────────────────────────────────
+    const checklistSlug = execution.checklist.name
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")  // remove acentos
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .toLowerCase()
+      .slice(0, 40)
+    const filename = `checklist-${checklistSlug}-${execId}-${data.tipo}.docx`
+
     // ── Sobe pro Cloudinary ──────────────────────────────────────────────
-    const folder    = `bemoo/companies/${session.user.companyId}/reports`
-    const publicId  = `execucao-${execId}-${data.tipo}`
-    const filename  = `checklist-${execution.checklist.name.replace(/\s+/g, "-").toLowerCase()}-${execId}.docx`
+    const folder   = `bemoo/companies/${session.user.companyId}/reports`
+    const publicId = `execucao-${execId}-${data.tipo}`   // sem extensão (raw suporta)
 
     const uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
@@ -102,13 +117,21 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
       stream.end(buffer)
     })
 
-    // ── Salva URL na execução ────────────────────────────────────────────
+    // URL com fl_attachment para forçar download com extensão .docx
+    const downloadUrl = withDownloadFlag(uploadResult.secure_url, filename)
+
+    // ── Salva URL na execução (campo separado por tipo) ──────────────────
     await prisma.checklistExecution.update({
       where: { id: execId },
-      data:  { reportUrl: uploadResult.secure_url, reportGeneratedAt: new Date() },
+      data: {
+        reportGeneratedAt: new Date(),
+        ...(data.tipo === "basico"
+          ? { reportUrl:   downloadUrl }
+          : { reportIaUrl: downloadUrl }),
+      },
     })
 
-    return ok({ url: uploadResult.secure_url, filename })
+    return ok({ url: downloadUrl, filename })
   } catch (err) {
     console.error("[POST /api/execucoes/[id]/relatorio]", err)
     return serverError("Erro ao gerar o relatório.")
