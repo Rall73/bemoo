@@ -13,7 +13,8 @@ export default auth((req) => {
     pathname.startsWith("/aceitar-convite") ||
     pathname.startsWith("/privacidade") ||
     pathname.startsWith("/termos") ||
-    pathname.startsWith("/api/auth")
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/setup")   // rotas de setup protegidas por SEED_SECRET próprio
 
   if (!isPublicRoute && !isAuthenticated) {
     return NextResponse.redirect(new URL("/login", req.url))
