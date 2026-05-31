@@ -8,7 +8,7 @@ import { MODULES_CONFIG } from "@/lib/modules"
 import {
   CheckSquare, AlertTriangle, Tag, Target, Inbox,
   LayoutDashboard, LogOut, ChevronRight, Users,
-  Building2, BarChart2, ScrollText, UserCircle, X, Layers,
+  Building2, BarChart2, ScrollText, UserCircle, X, Layers, History,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -71,14 +71,26 @@ export function NavSidebar({ user, enabledModules, onClose }: NavSidebarProps) {
             {navModules.map((mod) => {
               const Icon = MODULE_ICONS[mod.key as keyof typeof MODULE_ICONS]
               return (
-                <NavLink
-                  key={mod.key}
-                  href={mod.href}
-                  icon={Icon}
-                  label={mod.label}
-                  current={pathname}
-                  onClick={handleLinkClick}
-                />
+                <div key={mod.key}>
+                  <NavLink
+                    href={mod.href}
+                    icon={Icon}
+                    label={mod.label}
+                    current={pathname}
+                    onClick={handleLinkClick}
+                  />
+                  {/* Sub-links do módulo checklists */}
+                  {mod.key === "checklists" && (
+                    <NavLink
+                      href="/execucoes"
+                      icon={History}
+                      label="Histórico"
+                      current={pathname}
+                      onClick={handleLinkClick}
+                      indent
+                    />
+                  )}
+                </div>
               )
             })}
           </>
@@ -131,13 +143,14 @@ export function NavSidebar({ user, enabledModules, onClose }: NavSidebarProps) {
 }
 
 function NavLink({
-  href, icon: Icon, label, current, onClick,
+  href, icon: Icon, label, current, onClick, indent,
 }: {
-  href:    string
-  icon:    React.ElementType
-  label:   string
-  current: string
+  href:     string
+  icon:     React.ElementType
+  label:    string
+  current:  string
   onClick?: () => void
+  indent?:  boolean
 }) {
   const active = current === href || (href !== "/dashboard" && current.startsWith(href))
   return (
@@ -145,14 +158,17 @@ function NavLink({
       href={href}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2.5 px-3 py-2 rounded-soft text-sm transition-colors",
+        "flex items-center gap-2.5 py-1.5 rounded-soft text-sm transition-colors",
+        indent ? "px-3 pl-8" : "px-3",
         active
           ? "bg-primary-50 text-primary font-medium"
-          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          : indent
+            ? "text-gray-400 hover:bg-gray-50 hover:text-gray-700"
+            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
       )}
     >
-      <Icon size={18} strokeWidth={2} />
-      <span className="flex-1">{label}</span>
+      <Icon size={indent ? 15 : 18} strokeWidth={2} />
+      <span className="flex-1 text-xs">{label}</span>
       {active && <ChevronRight size={14} className="text-primary-500" />}
     </Link>
   )
