@@ -31,6 +31,9 @@ interface Props {
   invites:       Invite[]
   currentUserId: number
   isAdmin:       boolean
+  plan:          string
+  userLimit:     number | null   // null = ilimitado
+  activeCount:   number
 }
 
 // ─── Configurações de papel ────────────────────────────────────────
@@ -188,7 +191,11 @@ function ConfirmDialog({
 
 // ─── Componente principal ──────────────────────────────────────────
 
-export function UsuariosClient({ users, invites, currentUserId, isAdmin }: Props) {
+const PLAN_LABEL: Record<string, string> = {
+  FREE: "Free", STARTER: "Starter", PROFESSIONAL: "Professional", ENTERPRISE: "Enterprise",
+}
+
+export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, userLimit, activeCount }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
 
@@ -294,24 +301,48 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin }: Props
       <div className="p-6 max-w-4xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900" style={{ letterSpacing: "-0.02em" }}>
               Usuários
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Gerencie os membros da sua equipe e convites pendentes.
-            </p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <p className="text-sm text-gray-500">
+                {userLimit !== null
+                  ? `${activeCount} de ${userLimit} usuário${userLimit !== 1 ? "s" : ""} usados`
+                  : `${activeCount} usuário${activeCount !== 1 ? "s" : ""}`
+                }
+              </p>
+              <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                Plano {PLAN_LABEL[plan] ?? plan}
+              </span>
+              {userLimit !== null && activeCount >= userLimit && (
+                <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-red-50 text-error border border-red-100">
+                  Limite atingido
+                </span>
+              )}
+            </div>
           </div>
           {isAdmin && (
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setShowInviteModal(true)}
-            >
-              <UserPlus size={16} strokeWidth={2} />
-              Convidar pessoa
-            </Button>
+            <div className="flex flex-col items-end gap-1">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => userLimit === null || activeCount < userLimit ? setShowInviteModal(true) : null}
+                disabled={userLimit !== null && activeCount >= userLimit}
+                title={userLimit !== null && activeCount >= userLimit
+                  ? `Limite de ${userLimit} usuários atingido. Entre em contato para upgrade.`
+                  : undefined}
+              >
+                <UserPlus size={16} strokeWidth={2} />
+                Convidar pessoa
+              </Button>
+              {userLimit !== null && activeCount >= userLimit && (
+                <p className="text-[11px] text-gray-400">
+                  Limite do plano atingido — entre em contato para upgrade
+                </p>
+              )}
+            </div>
           )}
         </div>
 

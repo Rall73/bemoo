@@ -5,6 +5,7 @@ import { logAction, getIp } from "@/lib/audit"
 import { zConviteSchema } from "@/lib/validators"
 import { sendMail } from "@/lib/mailer"
 import { emailConvite } from "@/emails/convite"
+import { getUserLimit, PLAN_LABEL } from "@/lib/planLimits"
 
 /**
  * POST /api/usuarios/convite
@@ -20,6 +21,23 @@ export const POST = withAuth(async (req, session) => {
 
   const { email, role } = data
   const companyId = session.user.companyId
+
+  // Verificar limite de usuários do plano
+  const company = await prisma.company.findUnique({
+    where:  { id: companyId },
+    select: { name: true, plan: true, maxUsers: true },
+  })
+  if (company) {
+    const limit      = getUserLimit(company.plan, company.maxUsers)
+    const activeCount = await prisma.user.count({ where: { companyId, deletedAt: null } })
+    if (limit !== null && activeCount >= limit) {
+      const planLabel = PLAN_LABEL[company.plan] ?? company.plan
+      return badRequest(
+        `Limite de ${limit} usuário${limit !== 1 ? "s" : ""} atingido no plano ${planLabel}. ` +
+        `Entre em contato para fazer upgrade.`
+      )
+    }
+  }
 
   // E-mail já é membro ativo?
   const existingUser = await prisma.user.findFirst({
@@ -46,12 +64,6 @@ export const POST = withAuth(async (req, session) => {
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000)
 
   await prisma.invite.create({ data: { companyId, email, role, token, expiresAt } })
-
-  // Buscar nome da empresa para o e-mail
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
-    select: { name: true },
-  })
 
   sendMail({
     to: email,

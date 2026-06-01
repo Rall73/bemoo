@@ -18,6 +18,7 @@ const zUpdateSchema = z.object({
   email:    zEmail.optional(),
   document: z.string().max(30).optional(),
   plan:     z.enum(["FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE"]).optional(),
+  maxUsers: z.number().int().min(1).nullable().optional(),  // null = usar padrão do plano
   action:   z.enum(["suspend", "reactivate"]).optional(),
 })
 
@@ -43,13 +44,14 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const result = zUpdateSchema.safeParse(body)
   if (!result.success) return badRequest("Dados inválidos.")
 
-  const { name, email, document, plan, action } = result.data
+  const { name, email, document, plan, maxUsers, action } = result.data
   const updateData: Record<string, unknown> = {}
 
   if (name     !== undefined) updateData.name     = name
   if (email    !== undefined) updateData.email    = email
   if (document !== undefined) updateData.document = document
   if (plan     !== undefined) updateData.plan     = plan
+  if (maxUsers !== undefined) updateData.maxUsers = maxUsers
 
   if (action === "suspend")    updateData.suspendedAt = new Date()
   if (action === "reactivate") updateData.suspendedAt = null

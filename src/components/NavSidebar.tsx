@@ -132,10 +132,10 @@ export function NavSidebar({ user, enabledModules, onClose }: NavSidebarProps) {
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="w-full flex items-center gap-2 px-2 py-1.5 mt-1 text-xs text-gray-500 hover:text-error hover:bg-red-50 rounded-soft transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 mt-1 text-sm text-gray-500 border border-gray-200 hover:text-error hover:bg-red-50 hover:border-red-200 rounded-soft transition-colors"
         >
-          <LogOut size={14} strokeWidth={2} />
-          Sair
+          <LogOut size={16} strokeWidth={2} />
+          Sair da conta
         </button>
       </div>
     </aside>

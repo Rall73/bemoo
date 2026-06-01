@@ -36,6 +36,7 @@ model Company {
   document    String?
   email       String    @unique
   plan        Plan      @default(FREE)
+  maxUsers    Int?      @map("max_users")   // null = usa o limite padrão do plano
   createdAt    DateTime  @default(now()) @map("created_at")
   deletedAt    DateTime? @map("deleted_at")
   suspendedAt  DateTime? @map("suspended_at")

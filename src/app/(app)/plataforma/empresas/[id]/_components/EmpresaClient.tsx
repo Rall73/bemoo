@@ -17,6 +17,7 @@ interface Company {
   email:       string
   document:    string
   plan:        string
+  maxUsers:    number | null
   suspendedAt: string | null
 }
 
@@ -68,6 +69,7 @@ export function EmpresaClient({ company, users, enabledModules }: Props) {
     email:    company.email,
     document: company.document,
     plan:     company.plan,
+    maxUsers: company.maxUsers !== null ? String(company.maxUsers) : "",
   })
   const [saving,        setSaving]        = useState(false)
   const [saveError,     setSaveError]     = useState("")
@@ -98,6 +100,7 @@ export function EmpresaClient({ company, users, enabledModules }: Props) {
           email:    form.email.trim(),
           document: form.document.trim(),
           plan:     form.plan,
+          maxUsers: form.maxUsers.trim() !== "" ? parseInt(form.maxUsers) : null,
         }),
       })
       if (res.ok) {
@@ -207,6 +210,42 @@ export function EmpresaClient({ company, users, enabledModules }: Props) {
                 </label>
               ))}
             </div>
+          </div>
+
+          {/* Limite customizado de usuários */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Limite de usuários
+              <span className="ml-1.5 text-xs text-gray-400 font-normal">(override — deixe vazio para usar o padrão do plano)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={9999}
+                value={form.maxUsers}
+                onChange={(e) => setForm((f) => ({ ...f, maxUsers: e.target.value }))}
+                placeholder={
+                  form.plan === "FREE" ? "3 (padrão do plano)" :
+                  form.plan === "STARTER" ? "10 (padrão do plano)" :
+                  form.plan === "PROFESSIONAL" ? "30 (padrão do plano)" :
+                  "Ilimitado (padrão do plano)"
+                }
+                className="w-40 px-3 py-2 text-sm text-gray-800 bg-white border border-gray-200 rounded-soft focus:outline-none focus:border-primary"
+              />
+              {form.maxUsers.trim() !== "" && (
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, maxUsers: "" }))}
+                  className="text-xs text-gray-400 hover:text-error"
+                >
+                  Usar padrão
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Padrões: FREE=3 · STARTER=10 · PROFESSIONAL=30 · ENTERPRISE=ilimitado
+            </p>
           </div>
 
           {saveError && (

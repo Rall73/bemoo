@@ -24,6 +24,7 @@ export default async function EmpresaPage({
       email:       true,
       document:    true,
       plan:        true,
+      maxUsers:    true,
       createdAt:   true,
       suspendedAt: true,
     },
@@ -78,6 +79,7 @@ export default async function EmpresaPage({
           email:       company.email,
           document:    company.document ?? "",
           plan:        company.plan,
+          maxUsers:    company.maxUsers,
           suspendedAt: company.suspendedAt?.toISOString() ?? null,
         }}
         users={users.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() }))}
