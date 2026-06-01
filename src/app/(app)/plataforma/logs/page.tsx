@@ -1,28 +1,30 @@
 import type { Metadata } from "next"
 import { prisma } from "@/lib/prisma"
-import { Search } from "lucide-react"
+import { LogsFilters } from "./_components/LogsFilters"
 
 export const metadata: Metadata = { title: "Logs de auditoria" }
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  "login":                { label: "Login",              color: "bg-gray-100 text-gray-600" },
-  "logout":               { label: "Logout",             color: "bg-gray-100 text-gray-600" },
-  "usuario.criado":       { label: "Usuário criado",     color: "bg-green-50 text-green-700" },
-  "usuario.desativado":   { label: "Usuário desativado", color: "bg-red-50 text-error" },
-  "usuario.role_alterado":{ label: "Role alterado",      color: "bg-blue-50 text-blue-700" },
-  "convite.enviado":      { label: "Convite enviado",    color: "bg-blue-50 text-blue-700" },
-  "convite.reenviado":    { label: "Convite reenviado",  color: "bg-blue-50 text-blue-700" },
-  "convite.cancelado":    { label: "Convite cancelado",  color: "bg-yellow-50 text-yellow-700" },
-  "convite.aceito":       { label: "Convite aceito",     color: "bg-green-50 text-green-700" },
-  "empresa.criada":       { label: "Empresa criada",     color: "bg-green-50 text-green-700" },
-  "empresa.editada":      { label: "Empresa editada",    color: "bg-blue-50 text-blue-700" },
-  "empresa.suspensa":     { label: "Empresa suspensa",   color: "bg-red-50 text-error" },
-  "empresa.reativada":    { label: "Empresa reativada",  color: "bg-green-50 text-green-700" },
-  "modulo.habilitado":    { label: "Módulo habilitado",  color: "bg-primary-50 text-primary" },
-  "modulo.desabilitado":  { label: "Módulo desabilitado",color: "bg-yellow-50 text-yellow-700" },
-  "legal.aceito":         { label: "Legal aceito",       color: "bg-gray-100 text-gray-600" },
-  "senha.reset_solicitado":{ label: "Reset solicitado",  color: "bg-yellow-50 text-yellow-700" },
-  "senha.reset_concluido": { label: "Reset concluído",   color: "bg-gray-100 text-gray-600" },
+  "login":                     { label: "Login",               color: "bg-gray-100 text-gray-600" },
+  "logout":                    { label: "Logout",              color: "bg-gray-100 text-gray-600" },
+  "usuario.criado":            { label: "Usuário criado",      color: "bg-green-50 text-green-700" },
+  "usuario.desativado":        { label: "Usuário desativado",  color: "bg-red-50 text-error" },
+  "usuario.role_alterado":     { label: "Role alterado",       color: "bg-blue-50 text-blue-700" },
+  "convite.enviado":           { label: "Convite enviado",     color: "bg-blue-50 text-blue-700" },
+  "convite.reenviado":         { label: "Convite reenviado",   color: "bg-blue-50 text-blue-700" },
+  "convite.cancelado":         { label: "Convite cancelado",   color: "bg-yellow-50 text-yellow-700" },
+  "convite.aceito":            { label: "Convite aceito",      color: "bg-green-50 text-green-700" },
+  "empresa.criada":            { label: "Empresa criada",      color: "bg-green-50 text-green-700" },
+  "empresa.editada":           { label: "Empresa editada",     color: "bg-blue-50 text-blue-700" },
+  "empresa.suspensa":          { label: "Empresa suspensa",    color: "bg-red-50 text-error" },
+  "empresa.reativada":         { label: "Empresa reativada",   color: "bg-green-50 text-green-700" },
+  "modulo.habilitado":         { label: "Módulo habilitado",   color: "bg-primary-50 text-primary" },
+  "modulo.desabilitado":       { label: "Módulo desabilitado", color: "bg-yellow-50 text-yellow-700" },
+  "legal.aceito":              { label: "Legal aceito",        color: "bg-gray-100 text-gray-600" },
+  "senha.reset_solicitado":    { label: "Reset solicitado",    color: "bg-yellow-50 text-yellow-700" },
+  "senha.reset_concluido":     { label: "Reset concluído",     color: "bg-gray-100 text-gray-600" },
+  "checklist.executado":       { label: "Checklist executado", color: "bg-primary-50 text-primary" },
+  "checklist.importado_template": { label: "Template importado", color: "bg-primary-50 text-primary" },
 }
 
 const PAGE_SIZE = 50
@@ -39,7 +41,7 @@ export default async function LogsPage({
   if (filterAction)  where.action    = filterAction
   if (filterCompany) where.companyId = parseInt(filterCompany) || undefined
 
-  const [logs, total] = await Promise.all([
+  const [logs, total, companies] = await Promise.all([
     prisma.auditLog.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -51,28 +53,29 @@ export default async function LogsPage({
       },
     }),
     prisma.auditLog.count({ where }),
+    prisma.company.findMany({
+      where:   { deletedAt: null },
+      select:  { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
-
-  // Para o filtro de empresas
-  const companies = await prisma.company.findMany({
-    where:   { deletedAt: null },
-    select:  { id: true, name: true },
-    orderBy: { name: "asc" },
-  })
-
-  // Ações únicas para o filtro
-  const actionKeys = Object.keys(ACTION_LABELS)
+  const actionOptions = Object.entries(ACTION_LABELS).map(([key, { label }]) => ({ key, label }))
 
   function buildUrl(params: Record<string, string | number | undefined>) {
     const base: Record<string, string> = {}
     if (filterAction)  base.action  = filterAction
     if (filterCompany) base.company = filterCompany
     if (page > 1)      base.page    = String(page)
-    const merged = { ...base, ...Object.fromEntries(
-      Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
-    )}
+    const merged = {
+      ...base,
+      ...Object.fromEntries(
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, String(v)])
+      ),
+    }
     const qs = new URLSearchParams(merged).toString()
     return `/plataforma/logs${qs ? `?${qs}` : ""}`
   }
@@ -88,50 +91,16 @@ export default async function LogsPage({
         </p>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {/* Empresa */}
-        <form method="GET" action="/plataforma/logs" className="flex gap-2 flex-wrap">
-          {filterAction  && <input type="hidden" name="action"  value={filterAction} />}
-          <select
-            name="company"
-            defaultValue={filterCompany ?? ""}
-            onChange={(e) => (e.target.form as HTMLFormElement).submit()}
-            className="px-3 py-2 text-sm text-gray-800 bg-white border border-gray-300 rounded-soft focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Todas as empresas</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-
-          {/* Ação */}
-          <select
-            name="action"
-            defaultValue={filterAction ?? ""}
-            onChange={(e) => (e.target.form as HTMLFormElement).submit()}
-            className="px-3 py-2 text-sm text-gray-800 bg-white border border-gray-300 rounded-soft focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Todas as ações</option>
-            {actionKeys.map((k) => (
-              <option key={k} value={k}>{ACTION_LABELS[k].label}</option>
-            ))}
-          </select>
-
-          {(filterAction || filterCompany) && (
-            <a
-              href="/plataforma/logs"
-              className="px-3 py-2 text-sm text-gray-500 border border-gray-300 rounded-soft hover:bg-gray-50"
-            >
-              Limpar
-            </a>
-          )}
-        </form>
-      </div>
+      {/* Filtros — Client Component (onChange requer interatividade) */}
+      <LogsFilters
+        companies={companies}
+        actionKeys={actionOptions}
+        filterCompany={filterCompany}
+        filterAction={filterAction}
+      />
 
       {/* Tabela */}
       <div className="bg-white border border-gray-200 rounded-round overflow-hidden">
-        {/* Header */}
         <div className="hidden md:grid grid-cols-[0.9fr_1fr_0.9fr_1.2fr_0.6fr_1fr] gap-4 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wide">
           <span>Data</span>
           <span>Empresa</span>
@@ -149,6 +118,17 @@ export default async function LogsPage({
 
         {logs.map((log, idx) => {
           const actionCfg = ACTION_LABELS[log.action] ?? { label: log.action, color: "bg-gray-100 text-gray-600" }
+
+          // Tenta extrair status do e-mail do payload
+          let emailBadge: string | null = null
+          if ((log.action === "convite.enviado" || log.action === "convite.reenviado") && log.payloadAfter) {
+            try {
+              const after = JSON.parse(log.payloadAfter)
+              if (after.emailEnviado === false) emailBadge = "⚠ e-mail falhou"
+              else if (after.emailEnviado === true) emailBadge = "✓ e-mail entregue"
+            } catch { /* ignora */ }
+          }
+
           return (
             <div
               key={log.id}
@@ -156,7 +136,6 @@ export default async function LogsPage({
                 idx < logs.length - 1 ? "border-b border-gray-100" : ""
               }`}
             >
-              {/* Data */}
               <span className="text-xs text-gray-500 tabular-nums">
                 {new Date(log.createdAt).toLocaleString("pt-BR", {
                   day: "2-digit", month: "2-digit", year: "2-digit",
@@ -164,12 +143,10 @@ export default async function LogsPage({
                 })}
               </span>
 
-              {/* Empresa */}
               <span className="text-xs text-gray-700 truncate">
                 {log.company?.name ?? `#${log.companyId}`}
               </span>
 
-              {/* Usuário */}
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-800 truncate">
                   {log.user?.name ?? "—"}
@@ -179,17 +156,23 @@ export default async function LogsPage({
                 </p>
               </div>
 
-              {/* Ação */}
-              <span className={`text-xs font-medium px-2 py-0.5 rounded w-fit ${actionCfg.color}`}>
-                {actionCfg.label}
-              </span>
+              <div className="flex flex-col gap-0.5">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded w-fit ${actionCfg.color}`}>
+                  {actionCfg.label}
+                </span>
+                {emailBadge && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded w-fit ${
+                    emailBadge.startsWith("⚠") ? "bg-red-50 text-error" : "bg-green-50 text-green-700"
+                  }`}>
+                    {emailBadge}
+                  </span>
+                )}
+              </div>
 
-              {/* Entidade */}
               <span className="text-xs text-gray-500">
                 {log.entity ? `${log.entity}${log.entityId ? ` #${log.entityId}` : ""}` : "—"}
               </span>
 
-              {/* IP */}
               <span className="text-xs text-gray-400 font-mono truncate">
                 {log.ip ?? "—"}
               </span>
