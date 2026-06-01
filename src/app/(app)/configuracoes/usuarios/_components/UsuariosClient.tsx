@@ -64,7 +64,7 @@ function isExpired(iso: string) {
 
 // ─── Modal de convite ──────────────────────────────────────────────
 
-function InviteModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+function InviteModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (msg: string) => void }) {
   const [email,   setEmail]   = useState("")
   const [role,    setRole]    = useState<Role>("EXECUTOR")
   const [loading, setLoading] = useState(false)
@@ -95,7 +95,8 @@ function InviteModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
         }
         return
       }
-      onSuccess()
+      // Convite criado mas e-mail com falha de entrega
+      onSuccess(json.message ?? "Convite enviado com sucesso!")
     } catch {
       setGlobalError("Erro de conexão. Tente novamente.")
     } finally {
@@ -261,8 +262,9 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
     setActionLoading(`resend-${inviteId}`)
     try {
       const res = await fetch(`/api/usuarios/convite/${inviteId}`, { method: "POST" })
-      if (res.ok) { showFeedback("Convite reenviado com novo prazo de 48h."); refresh() }
-      else { const j = await res.json(); showFeedback(j.message ?? "Erro ao reenviar.") }
+      const j   = await res.json()
+      if (res.ok) { showFeedback(j.message ?? "Convite reenviado com novo prazo de 48h."); refresh() }
+      else { showFeedback(j.message ?? "Erro ao reenviar.") }
     } catch { showFeedback("Erro de conexão.") }
     finally { setActionLoading(null) }
   }
@@ -273,7 +275,7 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
       {showInviteModal && (
         <InviteModal
           onClose={() => setShowInviteModal(false)}
-          onSuccess={() => { setShowInviteModal(false); showFeedback("Convite enviado com sucesso!"); refresh() }}
+          onSuccess={(msg) => { setShowInviteModal(false); showFeedback(msg); refresh() }}
         />
       )}
       {confirmDeactivate && (

@@ -28,7 +28,7 @@ export const POST = withAuth(async (req, session) => {
     select: { name: true, plan: true, maxUsers: true },
   })
   if (company) {
-    const limit      = getUserLimit(company.plan, company.maxUsers)
+    const limit       = getUserLimit(company.plan, company.maxUsers)
     const activeCount = await prisma.user.count({ where: { companyId, deletedAt: null } })
     if (limit !== null && activeCount >= limit) {
       const planLabel = PLAN_LABEL[company.plan] ?? company.plan
@@ -41,7 +41,7 @@ export const POST = withAuth(async (req, session) => {
 
   // E-mail já é membro ativo?
   const existingUser = await prisma.user.findFirst({
-    where: { email, companyId, deletedAt: null },
+    where:  { email, companyId, deletedAt: null },
     select: { id: true },
   })
   if (existingUser) {
@@ -50,7 +50,7 @@ export const POST = withAuth(async (req, session) => {
 
   // Já existe convite pendente não expirado?
   const existingInvite = await prisma.invite.findFirst({
-    where: { companyId, email, acceptedAt: null, expiresAt: { gt: new Date() } },
+    where:  { companyId, email, acceptedAt: null, expiresAt: { gt: new Date() } },
     select: { id: true },
   })
   if (existingInvite) {
@@ -62,27 +62,53 @@ export const POST = withAuth(async (req, session) => {
   // Criar convite (token hex 32 bytes, 48h de validade)
   const token     = crypto.randomBytes(32).toString("hex")
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000)
+  const invite    = await prisma.invite.create({ data: { companyId, email, role, token, expiresAt } })
 
-  await prisma.invite.create({ data: { companyId, email, role, token, expiresAt } })
+  // Tentar enviar e-mail — aguarda resultado para registrar no audit log
+  let emailOk   = false
+  let emailErro = ""
+  const remetente = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@bemoo.net"
 
-  sendMail({
-    to: email,
-    ...emailConvite({
-      nomeConvidado:  email,
-      nomeEmpresa:    company?.name ?? "bemoo",
-      nomeConvidador: session.user.name ?? session.user.email ?? "Administrador",
-      token,
-    }),
-  }).catch((err) => console.error("[Mailer] Falha ao enviar convite:", err))
+  try {
+    await sendMail({
+      to: email,
+      ...emailConvite({
+        nomeConvidado:  email,
+        nomeEmpresa:    company?.name ?? "bemoo",
+        nomeConvidador: session.user.name ?? session.user.email ?? "Administrador",
+        token,
+      }),
+    })
+    emailOk = true
+  } catch (err: any) {
+    emailErro = err?.message ?? "Erro desconhecido"
+    console.error("[Mailer] Falha ao enviar convite:", err)
+  }
 
+  // Registra no audit log com resultado real do envio
   await logAction({
-    companyId: companyId,
-    userId:    parseInt(session.user.id),
-    action:    "convite.enviado",
-    entity:    "invite",
-    after:     { email, role },
-    ip:        getIp(req),
+    companyId,
+    userId:  parseInt(session.user.id),
+    action:  "convite.enviado",
+    entity:  "invite",
+    entityId: invite.id,
+    after: {
+      email,
+      role,
+      emailEnviado: emailOk,
+      remetente,
+      ...(emailErro && { emailErro }),
+    },
+    ip: getIp(req),
   })
+
+  // Convite criado mesmo se e-mail falhou — ADMIN pode reenviar
+  if (!emailOk) {
+    return ok({
+      message: "Convite criado, mas o e-mail não pôde ser entregue. Use 'Reenviar' para tentar novamente.",
+      emailFalhou: true,
+    })
+  }
 
   return ok({ message: "Convite enviado." })
 })

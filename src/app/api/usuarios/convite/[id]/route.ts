@@ -70,15 +70,26 @@ export const POST = withAuthCtx<P>(async (req, session, params) => {
     select: { name: true },
   })
 
-  sendMail({
-    to: invite.email,
-    ...emailConvite({
-      nomeConvidado:  invite.email,
-      nomeEmpresa:    company?.name ?? "bemoo",
-      nomeConvidador: session.user.name ?? session.user.email ?? "Administrador",
-      token,
-    }),
-  }).catch((err) => console.error("[Mailer] Falha ao reenviar convite:", err))
+  // Tentar reenviar e aguardar resultado
+  let emailOk   = false
+  let emailErro = ""
+  const remetente = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@bemoo.net"
+
+  try {
+    await sendMail({
+      to: invite.email,
+      ...emailConvite({
+        nomeConvidado:  invite.email,
+        nomeEmpresa:    company?.name ?? "bemoo",
+        nomeConvidador: session.user.name ?? session.user.email ?? "Administrador",
+        token,
+      }),
+    })
+    emailOk = true
+  } catch (err: any) {
+    emailErro = err?.message ?? "Erro desconhecido"
+    console.error("[Mailer] Falha ao reenviar convite:", err)
+  }
 
   await logAction({
     companyId: session.user.companyId,
@@ -86,9 +97,21 @@ export const POST = withAuthCtx<P>(async (req, session, params) => {
     action:    "convite.reenviado",
     entity:    "invite",
     entityId:  inviteId,
-    after:     { email: invite.email },
-    ip:        getIp(req),
+    after: {
+      email:        invite.email,
+      emailEnviado: emailOk,
+      remetente,
+      ...(emailErro && { emailErro }),
+    },
+    ip: getIp(req),
   })
+
+  if (!emailOk) {
+    return ok({
+      message: "Convite atualizado, mas o e-mail não pôde ser entregue. Tente novamente em alguns minutos.",
+      emailFalhou: true,
+    })
+  }
 
   return ok({ message: "Convite reenviado." })
 })
