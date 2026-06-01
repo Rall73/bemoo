@@ -1,5 +1,12 @@
 @AGENTS.md
 
+## Documentação do projeto
+
+Antes de planejar ou implementar qualquer feature, consulte:
+
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** — como o sistema funciona hoje: modelos, APIs, fluxos, padrões, armadilhas
+- **[PIPELINE.md](./PIPELINE.md)** — o que está feito e o que está planejado
+
 ## Projeto: bemoo
 
 Plataforma SaaS multi-módulo para gestão operacional de empresas.
