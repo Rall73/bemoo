@@ -1,7 +1,7 @@
 # bemoo — Arquitetura do Sistema
 
 > Documento vivo. Atualizar sempre que um módulo, rota ou padrão novo for adicionado.
-> Última revisão: 2026-06-01
+> Última revisão: 2026-06-01 (rev 2)
 >
 > Complementa o [PIPELINE.md](./PIPELINE.md) (o quê está feito/planejado) com
 > o **como** o sistema funciona hoje.
@@ -422,6 +422,31 @@ Toda mutação relevante chama `logAction()` com `before`/`after`.
 
 ---
 
+## Convenções adicionais
+
+### Limites de usuários por plano (`src/lib/planLimits.ts`)
+```
+FREE=3, STARTER=10, PROFESSIONAL=30, ENTERPRISE=∞
+getUserLimit(plan, company.maxUsers) — maxUsers overrida o padrão do plano
+```
+Verificado em `POST /api/usuarios/convite` antes de criar o convite.
+Override configurável em `/plataforma/empresas/[id]` pelo super-admin.
+
+### Audit log de e-mail
+`sendMail()` é sempre `await`-ado. Resultado gravado no `payloadAfter`:
+```json
+{ "emailEnviado": true, "remetente": "noreply@bemoo.net" }
+{ "emailEnviado": false, "emailErro": "Connection refused" }
+```
+Visível em `/plataforma/logs` com badge verde/vermelho por convite.
+
+### Event handlers em Server Components
+**NUNCA** colocar `onChange`, `onClick`, `onSubmit` etc. em Server Components.
+O build passa, mas o Passenger/Node.js crasha em runtime com "This page couldn't load" (ERROR 4093732788).
+Sempre mover para arquivo separado com `"use client"`.
+
+---
+
 ## Armadilhas documentadas
 
 | Sintoma | Causa | Solução |
@@ -433,3 +458,6 @@ Toda mutação relevante chama `logAction()` com `before`/`after`.
 | Template não aparece (company_id null) | Coluna era NOT NULL | `ALTER TABLE checklists MODIFY COLUMN company_id INT NULL` |
 | Internal Server Error após deploy | Cliente Prisma desatualizado | `postinstall: "prisma generate"` no package.json |
 | E-mail não chega (535 auth failed) | `#` na senha SMTP trunca | Evitar `#` em senhas no .env |
+| "This page couldn't load" ERROR 4093732788, build passou | `onChange`/`onClick` em Server Component — build não rejeita, Passenger crasha em runtime | Mover para componente filho com `"use client"` |
+| Página quebra após `prisma generate` mas antes de rodar SQL | Prisma client espera coluna nova que o banco ainda não tem | Sempre rodar SQL no phpMyAdmin **antes** do push |
+| `sendMail` retorna ok mas e-mail não chegou, sem evidência | Fire-and-forget com `.catch()` silencioso | `await sendMail()` + gravar `emailEnviado` no audit log |

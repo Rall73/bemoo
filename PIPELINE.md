@@ -89,6 +89,7 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 - [x] Envia e-mail de boas-vindas
 
 ### 2.2 Wizard de onboarding — pendente
+
 - [ ] Campo `onboarding_completed_at DATETIME` na tabela `companies`
 - [ ] Passo 1 — Perfil da empresa (segmento, tamanho)
 - [ ] Passo 2 — Escolha de módulos (FREE = 1 módulo)
@@ -100,6 +101,11 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 - [x] Página pública `/aceitar-convite?token=xxx` com formulário de nome + senha
 - [x] `POST /api/aceitar-convite` — cria usuário + marca invite + grava aceite legal em `$transaction`
 - [x] Reenvio de convite gera novo token + novo prazo (48h)
+- [x] **Limite por plano** — FREE=3, STARTER=10, PROFESSIONAL=30, ENTERPRISE=∞ (`src/lib/planLimits.ts`)
+- [x] **Override por empresa** — campo `companies.max_users` configurável em `/plataforma/empresas/[id]`
+- [x] **Contador de slots** — UI mostra "X/Y usuários usados · Plano Free", botão desabilitado ao limite
+- [x] **Audit log de e-mail** — `sendMail` aguardado; `emailEnviado: true/false` + `remetente` gravados no log
+- [x] `/plataforma/logs` — badge "✓ e-mail entregue" / "⚠ e-mail falhou" por convite
 
 ### 2.4 Gestão de usuários ✅
 - [x] `/configuracoes/usuarios` — listar membros ativos e convites pendentes
@@ -292,25 +298,27 @@ recriação de ambiente. Detalhe do schema completo em `prisma/schema.prisma`.
   1.5  Cloudinary: upload de fotos (base64, server-side, pasta por empresa)
   1.6  IA Whisper: transcrição de áudio (/api/transcribe)
   2.1  Cadastro self-service
-  2.3  Convite de usuários (envio, reenvio, cancelamento, aceite)
-  2.4  Gestão de usuários (/configuracoes/usuarios)
+  2.3  Convites: envio, reenvio, aceite, cancelamento + limite por plano + audit de e-mail
+  2.4  Gestão de usuários: roles, desativar, contador de slots, botão logout destacado
   2.5  Configurações: /configuracoes/empresa + /configuracoes/conta
   2.6  Redefinição de senha
-  3    Painel de plataforma completo (empresas, módulos, usuários, métricas, logs)
-  4    E-mail transacional (boas-vindas, convite, reset)
+  3    Painel de plataforma completo + override de limite por empresa em /plataforma/empresas/[id]
+  4    E-mail transacional (boas-vindas, convite, reset) com registro de entrega no audit log
   5.1  /privacidade + /termos + cookie consent
   5.2  Versionamento legal + LegalGate
-  6.1  Checklists: CRUD 3 níveis + execução com foto/áudio/anotação + histórico
+  6.1  Checklists: CRUD 3 níveis + execução + N/A + refs normativas + histórico + relatórios .docx + IA
+  6.1+ Templates globais (ISO 9001:2015 em produção, 13 seções, 72 campos)
   PWA  Ícones de instalação (icon-192/512, apple-touch-icon)
+  DOC  ARCHITECTURE.md — mapa completo do sistema (APIs, fluxos, modelos, armadilhas)
 
 ⏳ PRÓXIMO (em ordem de prioridade)
-  6.1+ Relatório final editável (.docx) — 2 versões via IA (GPT)
-  6.1+ Dashboard de checklists (KPIs: conformidade %, pendentes)
+  6.1+ Dashboard de checklists (KPIs: conformidade %, pendentes, atrasados)
   2.2  Wizard de onboarding
   1.3  Rate limiting (Upstash) + revisar headers de segurança
+  6.2  Intercorrências
 
 🔮 DEPOIS
-  6.2–6.5  Demais módulos (Intercorrências, Rastreabilidade, Planos, Captura)
+  6.3–6.5  Rastreabilidade, Planos de Ação, Captura
   7  IA avançada · 8  WhatsApp · 9  Cron · 10  Sentry · 11  Billing
 ```
 
