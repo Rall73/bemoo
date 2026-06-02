@@ -150,7 +150,7 @@ export function EmpresaClient({ company, users, enabledModules }: Props) {
           <span>
             Esta empresa está suspensa desde{" "}
             {new Date(company.suspendedAt!).toLocaleDateString("pt-BR", {
-              day: "2-digit", month: "long", year: "numeric",
+              day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo",
             })}.
           </span>
         </div>
@@ -359,7 +359,7 @@ export function EmpresaClient({ company, users, enabledModules }: Props) {
                 </span>
                 <span className="text-xs text-gray-400">
                   {new Date(u.createdAt).toLocaleDateString("pt-BR", {
-                    day: "2-digit", month: "short", year: "numeric",
+                    day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo",
                   })}
                 </span>
               </div>

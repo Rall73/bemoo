@@ -60,7 +60,7 @@ export default async function EmpresaPage({
             {company.name}
           </h1>
           <p className="text-sm text-gray-500">
-            Criada em {new Date(company.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+            Criada em {new Date(company.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" })}
           </p>
         </div>
         <Link

@@ -318,7 +318,7 @@ export function ChecklistDetailClient({
             />
           </div>
           <p className="text-[11px] text-gray-400">
-            Criado por {initial.createdBy} · {new Date(initial.createdAt).toLocaleDateString("pt-BR")}
+            Criado por {initial.createdBy} · {new Date(initial.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
           </p>
           {canManage && (
             <div className="flex justify-end">

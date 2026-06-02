@@ -83,7 +83,7 @@ export default async function PlataformaUsuariosPage() {
 
             {/* Data */}
             <span className="text-gray-400 text-xs">
-              {new Date(user.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+              {new Date(user.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" })}
             </span>
           </div>
         ))}

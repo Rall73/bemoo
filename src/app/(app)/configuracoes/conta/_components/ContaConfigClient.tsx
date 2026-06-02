@@ -127,7 +127,7 @@ export function ContaConfigClient({ user }: Props) {
           <p className="text-xs text-gray-400">Membro desde</p>
           <p className="text-xs text-gray-600">
             {new Date(user.createdAt).toLocaleDateString("pt-BR", {
-              day: "2-digit", month: "short", year: "numeric",
+              day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo",
             })}
           </p>
         </div>

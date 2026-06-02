@@ -82,7 +82,7 @@ export function EmpresaConfigClient({ company, isAdmin }: Props) {
           <p className="text-xs text-gray-400 mb-1">Membro desde</p>
           <p className="text-sm text-gray-700">
             {new Date(company.createdAt).toLocaleDateString("pt-BR", {
-              day: "2-digit", month: "long", year: "numeric",
+              day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo",
             })}
           </p>
         </div>

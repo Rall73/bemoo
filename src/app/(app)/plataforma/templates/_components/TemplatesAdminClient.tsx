@@ -206,7 +206,7 @@ export function TemplatesAdminClient({ initialTemplates }: Props) {
                 )}
                 <p className="text-[11px] text-gray-400 mt-0.5">
                   {t.itemCount} {t.itemCount === 1 ? "seção" : "seções"} ·{" "}
-                  {new Date(t.createdAt).toLocaleDateString("pt-BR")}
+                  {new Date(t.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
                 </p>
               </div>
 
