@@ -15,11 +15,11 @@ const zBody = z.object({
   analise: z.string().optional(),   // obrigatório quando tipo = "ia"
 })
 
-// Monta URL de download com fl_attachment para garantir extensão .docx no download
-function withDownloadFlag(url: string, filename: string): string {
-  // Insere fl_attachment:filename após /upload/
-  const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "_")
-  return url.replace("/upload/", `/upload/fl_attachment:${safe}/`)
+// Monta URL de download com fl_attachment para forçar download
+// IMPORTANTE: não passar nome com ponto no fl_attachment — Cloudinary interpreta
+// o ponto como separador de formato e retorna 400. A extensão .docx fica no publicId.
+function withDownloadFlag(url: string): string {
+  return url.replace("/upload/", "/upload/fl_attachment/")
 }
 
 // POST /api/execucoes/[id]/relatorio
@@ -103,8 +103,10 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
     const filename = `checklist-${checklistSlug}-${execId}-${data.tipo}.docx`
 
     // ── Sobe pro Cloudinary ──────────────────────────────────────────────
+    // publicId inclui .docx → URL final já tem a extensão correta
+    // fl_attachment sem nome customizado usa o publicId como nome do arquivo
     const folder   = `bemoo/companies/${session.user.companyId}/reports`
-    const publicId = `execucao-${execId}-${data.tipo}`   // sem extensão (raw suporta)
+    const publicId = `execucao-${execId}-${data.tipo}.docx`
 
     const uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
@@ -117,8 +119,8 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
       stream.end(buffer)
     })
 
-    // URL com fl_attachment para forçar download com extensão .docx
-    const downloadUrl = withDownloadFlag(uploadResult.secure_url, filename)
+    // fl_attachment sem nome customizado — extensão vem do publicId (.docx)
+    const downloadUrl = withDownloadFlag(uploadResult.secure_url)
 
     // ── Salva URL na execução (campo separado por tipo) ──────────────────
     await prisma.checklistExecution.update({
