@@ -404,10 +404,28 @@ Para habilitar módulo: painel `/plataforma/empresas/[id]/modulos` → toggle.
 Todo modelo de domínio tem `deleted_at DateTime?` + `deleted_by Int?`.
 Nunca `DELETE` físico de dado do usuário.
 
-### Fuso horário
-Servidor em UTC, usuários em BRT (UTC-3).
-Nunca `new Date()` cru em rota de API para datas relativas.
+### Fuso horário — DUAS regras obrigatórias
+
+**Regra 1 — Cálculo (backend/API):**
+Nunca `new Date()` cru para "hoje" ou data relativa.
 Usar `hojeNoBrasil()` / `inicioMesNoBrasil()` de `src/lib/date.ts`.
+
+**Regra 2 — Exibição (qualquer componente, inclusive Server Components e reportDocx):**
+`toLocaleString`/`toLocaleDateString` sem `timeZone` usa o fuso do servidor (UTC) → datas 3h erradas.
+
+```tsx
+// ✅ usar sempre — helpers em src/lib/date.ts
+import { formatarData, formatarDataHora } from "@/lib/date"
+
+// ✅ ou explícito
+new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", ... })
+
+// ❌ PROIBIDO — exibe hora em UTC (3h adiantado)
+new Date(d).toLocaleString("pt-BR", { ... })        // sem timeZone
+new Date(d).toLocaleDateString("pt-BR")             // sem timeZone
+```
+
+> Já custou um fix em 13 arquivos simultâneos.
 
 ### Auditoria
 Toda mutação relevante chama `logAction()` com `before`/`after`.

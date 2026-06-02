@@ -37,10 +37,33 @@ Stack: Next.js 16 + Prisma 6 + Auth.js v5 + MySQL + Tailwind 3
 - Toda query filtra `deletedAt: null`
 - Toda tabela de domínio carrega `companyId` (isolamento de tenant)
 
-### Fuso horário
-- Servidor roda em UTC; usuários estão em Brasília (UTC-3)
-- Nunca `new Date()` cru em rota de API para "hoje" ou data relativa
-- Usar helpers de `src/lib/date.ts`: `hojeNoBrasil()`, `inicioMesNoBrasil()`
+### Fuso horário — DUAS regras, ambas obrigatórias
+
+**Regra 1 — Cálculo de datas (backend/API):**
+- Nunca `new Date()` cru para "hoje" ou data relativa em rotas de API
+- Usar `hojeNoBrasil()` / `inicioMesNoBrasil()` de `src/lib/date.ts`
+
+**Regra 2 — Exibição de datas (frontend, qualquer componente):**
+- `toLocaleString` e `toLocaleDateString` sem `timeZone` usam o fuso do servidor (UTC) → datas 3h erradas
+- **SEMPRE** incluir `timeZone: "America/Sao_Paulo"` OU usar os helpers prontos:
+
+```tsx
+// ✅ helpers prontos (src/lib/date.ts)
+import { formatarData, formatarDataHora } from "@/lib/date"
+formatarData(date)      // → "01/06/2026"
+formatarDataHora(date)  // → "01/06/2026 14:30"
+
+// ✅ inline com timeZone explícito
+new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", ... })
+new Date(iso).toLocaleString("pt-BR",     { timeZone: "America/Sao_Paulo", ... })
+
+// ❌ ERRADO — usa UTC, exibe hora 3h adiantada
+new Date(iso).toLocaleString("pt-BR", { ... })
+new Date(iso).toLocaleDateString("pt-BR")
+```
+
+Esta regra vale em **Server Components, Client Components e reportDocx**.
+Já aconteceu e custou um fix em 13 arquivos — não repita.
 
 ### UI
 - Ícones: sempre `lucide-react` (nunca emoji como ícone de navegação/ação)
