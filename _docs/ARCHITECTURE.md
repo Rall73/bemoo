@@ -1,7 +1,7 @@
 # bemoo — Arquitetura do Sistema
 
 > Documento vivo. Atualizar sempre que um módulo, rota ou padrão novo for adicionado.
-> Última revisão: 2026-06-01 (rev 2)
+> Última revisão: 2026-06-02 (rev 3)
 >
 > Complementa o [PIPELINE.md](./PIPELINE.md) (o quê está feito/planejado) com
 > o **como** o sistema funciona hoje.
@@ -18,7 +18,7 @@
 | UI | Tailwind 3 + lucide-react | Ícones sempre `lucide-react`. Inputs: `text-gray-800 bg-white` |
 | Deploy | Hostinger Node.js → GitHub push na `main` = rebuild | `npx tsc --noEmit && npx next build` antes de todo push |
 | Storage | Cloudinary (fotos, relatórios .docx) | `serverExternalPackages: ["cloudinary","openai"]` obrigatório |
-| E-mail | Nodemailer + SMTP Hostinger (`noreply@bemoo.net`) | Transporter criado dentro da função, nunca singleton |
+| E-mail | Nodemailer + SMTP Hostinger (`noreply@bemoo.com.br`) | Transporter criado dentro da função, nunca singleton |
 | IA | OpenAI Whisper (áudio→texto) + GPT-4o-mini (análise) | Lazy singleton. Chave com permissão **All** |
 
 ---
@@ -453,7 +453,7 @@ Override configurável em `/plataforma/empresas/[id]` pelo super-admin.
 ### Audit log de e-mail
 `sendMail()` é sempre `await`-ado. Resultado gravado no `payloadAfter`:
 ```json
-{ "emailEnviado": true, "remetente": "noreply@bemoo.net" }
+{ "emailEnviado": true, "remetente": "noreply@bemoo.com.br" }
 { "emailEnviado": false, "emailErro": "Connection refused" }
 ```
 Visível em `/plataforma/logs` com badge verde/vermelho por convite.
@@ -479,3 +479,34 @@ Sempre mover para arquivo separado com `"use client"`.
 | "This page couldn't load" ERROR 4093732788, build passou | `onChange`/`onClick` em Server Component — build não rejeita, Passenger crasha em runtime | Mover para componente filho com `"use client"` |
 | Página quebra após `prisma generate` mas antes de rodar SQL | Prisma client espera coluna nova que o banco ainda não tem | Sempre rodar SQL no phpMyAdmin **antes** do push |
 | `sendMail` retorna ok mas e-mail não chegou, sem evidência | Fire-and-forget com `.catch()` silencioso | `await sendMail()` + gravar `emailEnviado` no audit log |
+| E-mail enviado mas cai no spam ou falha autenticação | SMTP_USER/PASS apontando para domínio errado | SMTP deve usar caixa real do mesmo domínio do remetente — alias não autentica SMTP |
+
+---
+
+## Domínios e e-mail
+
+### Domínios ativos
+| Domínio | Papel | Status |
+|---|---|---|
+| `bemoo.com.br` | Domínio principal | ✅ Ativo (primário) |
+| `bemoo.net` | Domínio legado | ✅ Ativo (Parked Domain — aponta para o mesmo app) |
+
+Configuração no Hostinger: `bemoo.com.br` adicionado como **Parked Domain** no site Node.js do `bemoo.net`. Ambos servem o mesmo app. Para migrar o domínio principal futuramente, basta atualizar `NEXTAUTH_URL`.
+
+### E-mail transacional
+| Endereço | Tipo | Uso |
+|---|---|---|
+| `noreply@bemoo.com.br` | Caixa real (SMTP) | Remetente de todos os e-mails do sistema |
+| `contato@bemoo.com.br` | Alias → admin@ | Exibido nos Termos de Uso |
+| `privacidade@bemoo.com.br` | Alias → admin@ | Exibido na Política de Privacidade (DPO) |
+| `admin@bemoo.com.br` | Caixa real | Caixa administrativa (recebe aliases) |
+
+Variáveis de ambiente: `SMTP_USER=noreply@bemoo.com.br`, `SMTP_FROM=bemoo <noreply@bemoo.com.br>`, `SMTP_HOST=smtp.hostinger.com`, `SMTP_PORT=465`.
+
+### Google OAuth
+Credencial configurada no Google Cloud Console (projeto `My First Project`, ID do cliente OAuth `bemoo`).
+URIs autorizadas:
+- Origens JS: `https://bemoo.net`, `https://bemoo.com.br`
+- Callbacks: `https://bemoo.net/api/auth/callback/google`, `https://bemoo.com.br/api/auth/callback/google`
+
+Para adicionar novo domínio: Google Cloud Console → APIs e serviços → Credenciais → bemoo → adicionar nas duas listas → Salvar (pode levar até 1h para propagar).
