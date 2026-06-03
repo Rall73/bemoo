@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 const VERSION           = "1.0"
 const ULTIMA_ATUALIZACAO = "28 de maio de 2026"
-const CONTATO            = "contato@bemoo.net"
+const CONTATO            = "contato@bemoo.com.br"
 
 export default function TermosPage() {
   return (

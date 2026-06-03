@@ -73,7 +73,7 @@ export const POST = withAuthCtx<P>(async (req, session, params) => {
   // Tentar reenviar e aguardar resultado
   let emailOk   = false
   let emailErro = ""
-  const remetente = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@bemoo.net"
+  const remetente = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@bemoo.com.br"
 
   try {
     await sendMail({

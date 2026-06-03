@@ -67,7 +67,7 @@ export const POST = withAuth(async (req, session) => {
   // Tentar enviar e-mail — aguarda resultado para registrar no audit log
   let emailOk   = false
   let emailErro = ""
-  const remetente = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@bemoo.net"
+  const remetente = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@bemoo.com.br"
 
   try {
     await sendMail({

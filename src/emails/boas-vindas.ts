@@ -1,5 +1,5 @@
 export function emailBoasVindas({ nome, empresa }: { nome: string; empresa: string }) {
-  const url = process.env.NEXTAUTH_URL ?? "https://bemoo.net"
+  const url = process.env.NEXTAUTH_URL ?? "https://bemoo.com.br"
 
   return {
     subject: `Bem-vindo ao bemoo, ${nome}!`,

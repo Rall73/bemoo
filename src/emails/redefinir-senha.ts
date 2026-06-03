@@ -1,5 +1,5 @@
 export function emailRedefinirSenha({ token }: { token: string }) {
-  const url  = process.env.NEXTAUTH_URL ?? "https://bemoo.net"
+  const url  = process.env.NEXTAUTH_URL ?? "https://bemoo.com.br"
   const link = `${url}/redefinir-senha?token=${token}`
 
   return {

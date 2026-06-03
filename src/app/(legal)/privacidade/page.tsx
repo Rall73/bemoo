@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 const VERSION           = "1.0"
 const ULTIMA_ATUALIZACAO = "28 de maio de 2026"
-const CONTATO_DPO        = "privacidade@bemoo.net"
+const CONTATO_DPO        = "privacidade@bemoo.com.br"
 
 export default function PrivacidadePage() {
   return (
@@ -29,7 +29,7 @@ export default function PrivacidadePage() {
         </p>
         <p>
           Esta Política descreve como coletamos, usamos, armazenamos e protegemos
-          suas informações ao usar o bemoo em <a href="https://bemoo.net">bemoo.net</a>.
+          suas informações ao usar o bemoo em <a href="https://bemoo.com.br">bemoo.com.br</a>.
         </p>
       </Section>
 
