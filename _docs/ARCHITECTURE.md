@@ -471,7 +471,7 @@ Sempre mover para arquivo separado com `"use client"`.
 |---|---|---|
 | Câmera/microfone não pedem permissão | `Permissions-Policy: camera=()` vazio | `camera=(self), microphone=(self)` |
 | Upload/transcribe quebra em runtime | libs nativas não externalizadas | `serverExternalPackages: ["cloudinary","openai"]` |
-| Download sem extensão .docx | URL Cloudinary raw sem flag | `fl_attachment:nome.docx` na URL |
+| Download sem extensão .docx ou HTTP 400 no Cloudinary | `fl_attachment:nome.docx` — Cloudinary interpreta o `.` como separador de formato → 400 | Incluir `.docx` no `publicId` e usar `fl_attachment` **sem nome customizado**: `/upload/fl_attachment/` |
 | Campo JWT novo não aparece em session | Falta atualizar os 4 lugares | `authorize` + `jwt` + `session` + `next-auth.d.ts` |
 | Template não aparece (company_id null) | Coluna era NOT NULL | `ALTER TABLE checklists MODIFY COLUMN company_id INT NULL` |
 | Internal Server Error após deploy | Cliente Prisma desatualizado | `postinstall: "prisma generate"` no package.json |

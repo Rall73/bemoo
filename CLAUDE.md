@@ -1,126 +1,94 @@
-@AGENTS.md
+# bemoo — Contexto para o Claude
 
-## Documentação do projeto
+## Stack
+Next.js 16 (App Router) + Prisma 6 + Auth.js v5 + MySQL + Tailwind 3 + TypeScript
+Deploy: Hostinger Node.js gerenciado — `git push origin main` = rebuild automático.
+Sem `prisma migrate`: toda mudança de schema = SQL manual no phpMyAdmin.
 
-Antes de planejar ou implementar qualquer feature, consulte:
+## Documentação de referência
+Consulte antes de planejar qualquer feature:
+- `_docs/ARCHITECTURE.md` — modelos, APIs, fluxos, armadilhas conhecidas
+- `_docs/PIPELINE.md` — o que está feito e o que vem a seguir
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** — como o sistema funciona hoje: modelos, APIs, fluxos, padrões, armadilhas
-- **[PIPELINE.md](./PIPELINE.md)** — o que está feito e o que está planejado
+---
 
-## Projeto: bemoo
+## Regras críticas — todas obrigatórias
 
-Plataforma SaaS multi-módulo para gestão operacional de empresas.
-GitHub: https://github.com/Rall73/bemoo.git
-Stack: Next.js 16 + Prisma 6 + Auth.js v5 + MySQL + Tailwind 3
+### 1. Deploy
+Antes de qualquer `git push origin main`: `npx tsc --noEmit && npx next build`.
+Commit sem acentos no here-string do PowerShell (usar `-m "..."` simples).
+Variáveis de ambiente: apenas no painel da Hostinger, nunca no repo.
+Sem `output: 'standalone'` no next.config — quebra o Passenger.
 
-## Módulos previstos
+### 2. Banco de dados (MySQL)
+Schema alterado? Sequência obrigatória:
+1. Alterar `prisma/schema.prisma`
+2. Gerar o SQL equivalente e entregar ao usuário
+3. Aguardar "rodei o SQL"
+4. `npx prisma generate`
+5. Código que depende do campo novo
 
-- **Checklists** — listas de verificação com temperatura e ocorrências
-- **Intercorrências** — registro e acompanhamento de eventos
-- **Rastreabilidade** — controle de ativos e equipamentos
-- **Planos de Ação** — gestão de ações corretivas/preventivas
-- **Captura** — demandas, tarefas e ideias
+Soft delete em toda entidade de domínio: `deletedAt DateTime?` + `deletedBy Int?`.
+Toda query filtra `deletedAt: null` + `companyId` da sessão (nunca da URL).
 
-## Identidade visual
+### 3. Fuso horário — duas regras, ambas obrigatórias
 
-- Paleta A (verde-petróleo): primary `#1F4E4A`, accent `#E07A35`
-- Logo: conceito A "Olho atento" — "oo" como íris + pupila
-- Typography: Manrope (institutional), Inter (body), JetBrains Mono (code)
-- Tokens em `src/lib/tokens.ts`
+**Backend/API:** nunca `new Date()` cru. Usar `hojeNoBrasil()` / `inicioMesNoBrasil()` de `src/lib/date.ts`.
 
-## Convenções obrigatórias
-
-### Banco de dados
-- Provider: MySQL (`datasource db { provider = "mysql" }`)
-- Schema alterado? Gere o SQL equivalente e entregue ao usuário antes de escrever código dependente.
-- Soft delete em toda entidade de domínio: `deletedAt DateTime?` + `deletedBy Int?`
-- Toda query filtra `deletedAt: null`
-- Toda tabela de domínio carrega `companyId` (isolamento de tenant)
-
-### Fuso horário — DUAS regras, ambas obrigatórias
-
-**Regra 1 — Cálculo de datas (backend/API):**
-- Nunca `new Date()` cru para "hoje" ou data relativa em rotas de API
-- Usar `hojeNoBrasil()` / `inicioMesNoBrasil()` de `src/lib/date.ts`
-
-**Regra 2 — Exibição de datas (frontend, qualquer componente):**
-- `toLocaleString` e `toLocaleDateString` sem `timeZone` usam o fuso do servidor (UTC) → datas 3h erradas
-- **SEMPRE** incluir `timeZone: "America/Sao_Paulo"` OU usar os helpers prontos:
-
+**Frontend (qualquer componente, inclusive Server Components e reportDocx):**
 ```tsx
-// ✅ helpers prontos (src/lib/date.ts)
+// ✅ helpers prontos
 import { formatarData, formatarDataHora } from "@/lib/date"
-formatarData(date)      // → "01/06/2026"
-formatarDataHora(date)  // → "01/06/2026 14:30"
 
-// ✅ inline com timeZone explícito
-new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", ... })
-new Date(iso).toLocaleString("pt-BR",     { timeZone: "America/Sao_Paulo", ... })
+// ✅ inline correto
+new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
 
-// ❌ ERRADO — usa UTC, exibe hora 3h adiantada
-new Date(iso).toLocaleString("pt-BR", { ... })
+// ❌ ERRADO — exibe hora 3h adiantada (usa UTC do servidor)
 new Date(iso).toLocaleDateString("pt-BR")
 ```
+Já custou um fix em 13 arquivos. Não repetir.
 
-Esta regra vale em **Server Components, Client Components e reportDocx**.
-Já aconteceu e custou um fix em 13 arquivos — não repita.
-
-### UI
-- Ícones: sempre `lucide-react` (nunca emoji como ícone de navegação/ação)
-- Todo `<input>` e `<select>` precisa de `text-gray-800 bg-white` nas classes
-- Ícone: `size={20}` navegação, `strokeWidth={2}`
-- Componentes base em `src/components/ui/`
-
-### Módulos
-- Novos módulos entram em `src/lib/modules.ts` (MODULES_CONFIG)
-- Habilitar módulo para empresa: insert em `company_modules`
-- Middleware verifica autenticação; acesso ao módulo é verificado no layout `(app)`
-
-### APIs e segurança
-
-**Wrappers obrigatórios** — nunca chame `auth()` diretamente em rotas:
-- `withAuth(handler, minRole?)` — rotas simples sem `params` dinâmicos
-- `withAuthCtx<P>(handler, minRole?)` — rotas com `params` dinâmicos (Next.js 16: `params` é Promise)
-
+### 4. Autenticação e segurança de API
+Nunca chamar `auth()` diretamente em rotas. Usar os wrappers:
 ```typescript
 // Rota simples
 export const PATCH = withAuth(async (req, session) => { ... })
 
-// Rota dinâmica
+// Rota com params dinâmicos (Next.js 16: params é Promise)
 export const GET = withAuthCtx<{ id: string }>(async (req, session, params) => {
   const { id } = params  // já awaited pelo wrapper
 })
 ```
+- `validateBody(req, zSchema)` — validação Zod em toda rota com body
+- `assertSameCompany(sessionCompanyId, resourceId)` — 403 se tenant divergir
+- `assertMinRole(role, minRole)` — hierarquia: ADMIN > GESTOR > EXECUTOR > AUDITOR
+- `withPlatformAdmin(handler)` — painel `/plataforma`
 
-- `validateBody(req, zSchema)` — validação Zod; retorna `{ data }` ou `{ error: NextResponse }`
-- `assertSameCompany(sessionCompanyId, resourceCompanyId)` — retorna 403 se divergir
-- `assertMinRole(userRole, minRole)` — hierarquia: ADMIN > GESTOR > EXECUTOR > AUDITOR
+### 5. Foto e áudio (lições pagas — não repetir)
+- **Foto:** rota `/api/upload` usa base64 data URI, nunca `upload_stream`. `photoUrls` = estado separado no client (`Record<string,string>`), não dentro dos valores do form.
+- **Áudio:** nunca vai pro Cloudinary — só a transcrição é salva. MediaRecorder com `isTypeSupported()`.
+- **`next.config.mjs` crítico:** `Permissions-Policy: camera=(self), microphone=(self)` (parênteses vazios = câmera nunca pede permissão). `serverExternalPackages: ["cloudinary", "openai"]` obrigatório.
+- Clientes OpenAI/Cloudinary: lazy singleton, nunca `new OpenAI()` no topo do módulo.
+- Testar credencial localmente com script Node antes de culpar deploy.
 
-**Tenant isolation:** toda query de domínio filtra por `companyId` da sessão — **nunca** da URL.
+### 6. UI e componentes
+- Ícones: sempre `lucide-react` — nunca emoji como ícone de navegação/ação
+- Todo `<input>` e `<select>`: classes `text-gray-800 bg-white`
+- Ícone de navegação: `size={20}`, `strokeWidth={2}`
+- Componentes base em `src/components/ui/`
+- **Nunca** event handlers (`onChange`, `onClick`, `onSubmit`) em Server Components — build passa mas Passenger crasha em runtime (ERROR 4093732788). Mover para arquivo filho com `"use client"`.
 
-**Auditoria** (`src/lib/audit.ts`):
-- `logAction({ companyId, userId, action, entity?, entityId?, payloadBefore?, payloadAfter?, ip? })` — fire-and-forget, nunca lança
-- `getIp(req)` — extrai IP do header `x-forwarded-for` ou `x-real-ip`
-- Tipo `AuditAction` — usar sempre para type safety (ex.: `"empresa.editada"`, `"modulo.habilitado"`)
-- Logar **antes e depois** em mutações relevantes (campo `payloadBefore` / `payloadAfter`)
+### 7. Novos módulos
+Registrar em `src/lib/modules.ts` (MODULES_CONFIG). Habilitar por empresa: insert em `company_modules`.
 
-### Mídia: câmera, microfone, upload (lições já pagas — NÃO repetir)
+### 8. Auditoria
+`logAction(...)` de `src/lib/audit.ts` — fire-and-forget, nunca lança.
+Logar `payloadBefore` + `payloadAfter` em toda mutação relevante.
+`AuditAction` é union type — adicionar ao union ao criar nova ação.
 
-> Detalhe completo na skill `hostinger-nextjs-playbook` §13 e na memória `project_bemoo.md`.
+---
 
-- **`next.config.mjs` é crítico para mídia:**
-  - `Permissions-Policy: camera=(self), microphone=(self)` — com `()` vazio o microfone/câmera **nunca pedem permissão** (popup não aparece)
-  - `serverExternalPackages: ["cloudinary", "openai"]` — sem isso o upload/transcrição quebra em runtime
-- **Foto:** rota `/api/upload` usa **base64 data URI** (`cloudinary.uploader.upload(dataUri)`), nunca `upload_stream`+preset. No client, `photoUrls` é estado **separado** (`Record<string,string>`), não dentro dos valores do form. Input: `<input type="file" accept="image/*" capture="environment">`.
-- **Áudio:** `MediaRecorder` com `isTypeSupported()` + `streamRef` separado + `mr.start(1000)` → `/api/transcribe` → Whisper (`whisper-1`, `language:"pt"`) → texto. **Áudio nunca vai pro Cloudinary** — só a transcrição é salva.
-- **Clientes externos (OpenAI/Cloudinary):** lazy singleton, nunca `new OpenAI()` no topo do módulo (falha no build).
-- **OpenAI key:** permissão **All** (Whisper não tem toggle em "Restricted").
-- **Credencial suspeita:** teste **localmente** com script Node lendo `.env.local` antes de culpar deploy/config (um typo no `CLOUDINARY_CLOUD_NAME` derrubou tudo). Nunca hardcode secret no comando.
-- **Antes de portar foto/áudio do check-list:** leia o código que funciona lá primeiro.
-
-### Deploy
-- Portão pré-push: `npx tsc --noEmit` → `npx next build` → `git push origin main`
-- Commit semântico via HEREDOC, arquivos nomeados (nunca `git add -A`)
-- Sem segredos no repo
-- ⚠️ **PowerShell + acentos:** `git commit -m @'...'@` (here-string) falha com caracteres acentuados.
-  Use `-m "..."` simples, ou escreva mensagem sem acento no here-string.
+## Identidade visual (resumo)
+- Paleta: primary `#1F4E4A` (verde-petróleo), accent `#E07A35`
+- Typography: Manrope (institucional), Inter (body), JetBrains Mono (código)
+- Tokens em `src/lib/tokens.ts` · Referência completa: `_docs/IDENTIDADE-VISUAL.md`
