@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import {
   ArrowLeft, Plus, Pencil, Trash2,
-  ChevronUp, ChevronDown, Save, CircleCheck,
+  ChevronUp, ChevronDown, Save, CircleCheck, ListPlus, X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -263,6 +263,68 @@ export function ChecklistDetailClient({
     setSavingEditField(false)
   }
 
+  // ─── Gerador de sequência ─────────────────────────────────────────
+  const [seqPanel, setSeqPanel] = useState<{
+    itemId: number
+    prefix: string
+    from:   number
+    to:     number
+  } | null>(null)
+  const [generatingSeq, setGeneratingSeq] = useState(false)
+
+  function openSeqPanel(item: Item) {
+    const match = item.label.match(/^(.*?)(\d+)$/)
+    const prefix = match ? match[1] : item.label
+    const from   = match ? Number(match[2]) : 1
+    setSeqPanel({ itemId: item.id, prefix, from: from + 1, to: from + 1 })
+  }
+
+  async function generateSequence() {
+    if (!seqPanel) return
+    const template = items.find((i) => i.id === seqPanel.itemId)
+    if (!template) return
+    const { prefix, from, to } = seqPanel
+    if (from < 1 || to < from) return
+
+    setGeneratingSeq(true)
+    const padWidth = String(to).length
+    const created: Item[] = []
+
+    for (let n = from; n <= to; n++) {
+      const label = `${prefix}${String(n).padStart(padWidth, "0")}`
+      const res   = await fetch(`/api/checklists/${initial.id}/items`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body:   JSON.stringify({ label }),
+      })
+      const json = await res.json()
+      if (!res.ok) continue
+      const newItem: Item = { ...json.data, fields: [] }
+
+      for (const field of template.fields) {
+        const fRes  = await fetch(`/api/checklists/${initial.id}/items/${newItem.id}/fields`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body:   JSON.stringify({
+            label:           field.label,
+            type:            field.type,
+            unit:            field.unit            ?? null,
+            required:        field.required,
+            requirePhoto:    field.requirePhoto,
+            reference:       field.reference       ?? null,
+            referenceSource: field.referenceSource ?? null,
+            allowNa:         field.allowNa,
+          }),
+        })
+        const fJson = await fRes.json()
+        if (fRes.ok) newItem.fields.push(fJson.data)
+      }
+      created.push(newItem)
+    }
+
+    setItems((prev) => [...prev, ...created])
+    setSeqPanel(null)
+    setGeneratingSeq(false)
+  }
+
   // ─── Totais ───────────────────────────────────────────────────────
   const totalFields = items.reduce((sum, i) => sum + i.fields.length, 0)
 
@@ -425,6 +487,13 @@ export function ChecklistDetailClient({
 
                   {canManage && editingItemId !== item.id && (
                     <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => openSeqPanel(item)}
+                        title="Gerar sequência de itens"
+                        className="p-1 rounded text-gray-400 hover:text-primary"
+                      >
+                        <ListPlus size={13} strokeWidth={2} />
+                      </button>
                       <button onClick={() => { setEditingItemId(item.id); setEditingItemLabel(item.label) }}
                         className="p-1 rounded text-gray-400 hover:text-primary">
                         <Pencil size={13} strokeWidth={2} />
@@ -436,6 +505,62 @@ export function ChecklistDetailClient({
                     </div>
                   )}
                 </div>
+
+                {/* Painel gerador de sequência */}
+                {seqPanel?.itemId === item.id && (
+                  <div className="px-3 py-3 bg-indigo-50 border-b border-indigo-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-indigo-800">Gerar sequência de itens</span>
+                      <button onClick={() => setSeqPanel(null)} className="text-indigo-400 hover:text-indigo-700">
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div>
+                        <p className="text-[10px] text-indigo-600 mb-0.5">Prefixo</p>
+                        <input
+                          value={seqPanel.prefix}
+                          onChange={(e) => setSeqPanel((s) => s && { ...s, prefix: e.target.value })}
+                          className="w-20 px-2 py-1.5 text-sm text-gray-800 bg-white border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
+                          placeholder="CT"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-indigo-600 mb-0.5">De</p>
+                        <input
+                          type="number" min={1} value={seqPanel.from}
+                          onChange={(e) => setSeqPanel((s) => s && { ...s, from: Math.max(1, Number(e.target.value)) })}
+                          className="w-16 px-2 py-1.5 text-sm text-gray-800 bg-white border border-indigo-300 rounded focus:outline-none focus:border-indigo-500 text-center"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-indigo-600 mb-0.5">Até</p>
+                        <input
+                          type="number" min={seqPanel.from} value={seqPanel.to}
+                          onChange={(e) => setSeqPanel((s) => s && { ...s, to: Math.max(s.from, Number(e.target.value)) })}
+                          className="w-16 px-2 py-1.5 text-sm text-gray-800 bg-white border border-indigo-300 rounded focus:outline-none focus:border-indigo-500 text-center"
+                        />
+                      </div>
+                      <div className="flex items-end gap-2 pb-0.5">
+                        <span className="text-[10px] text-indigo-500">
+                          → {seqPanel.to - seqPanel.from + 1} iten{seqPanel.to - seqPanel.from + 1 !== 1 ? "s" : ""}
+                          {seqPanel.prefix ? ` (${seqPanel.prefix}${String(seqPanel.from).padStart(String(seqPanel.to).length, "0")}…${seqPanel.prefix}${String(seqPanel.to).padStart(String(seqPanel.to).length, "0")})` : ""}
+                        </span>
+                        <Button
+                          type="button" variant="primary" size="sm"
+                          loading={generatingSeq}
+                          disabled={seqPanel.to < seqPanel.from || generatingSeq}
+                          onClick={generateSequence}
+                        >
+                          Gerar
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-indigo-400">
+                      Serão criados após {item.label}, com os mesmos campos.
+                    </p>
+                  </div>
+                )}
 
                 {/* Campos do item */}
                 <div className="divide-y divide-gray-100">
