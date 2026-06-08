@@ -1,7 +1,7 @@
 # bemoo — Pipeline de Desenvolvimento
 
 > Documento vivo. Atualizar a cada sprint concluída.
-> Última revisão: 2026-05-29
+> Última revisão: 2026-06-07
 >
 > Documentação operacional separada:
 > - **[LEGAL-VERSIONING.md](./LEGAL-VERSIONING.md)** — como publicar novas versões de Termos e Política
@@ -183,7 +183,8 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 ## Fase 6 — Módulos
 
 > Fluxo obrigatório: schema → SQL phpMyAdmin → aguardar confirmação → código.
-> Referência: `C:\Users\Ricardo\Blog\check-list\`
+> ⚠️ Repositório correto: `C:\Users\Ricardo\Blog\bemoo` → `Rall73/bemoo` → Hostinger.
+> A pasta `check-list` é um projeto separado — NÃO fazer push lá.
 
 ### 6.1 Checklists — em produção (estrutura base ✅)
 
@@ -194,6 +195,7 @@ Não portamos nenhum módulo antes de ter auth, acesso e compliance no lugar.
 - [x] Enums: `FieldType` (OK_NOK | SIM_NAO | NUMERIC | TEXT), `ExecutionStatus`
 - [x] Flag `companies.feature_audio` — controle de permissão de áudio por empresa
 - [x] CRUD de modelos: criar/editar/arquivar checklist; itens e campos inline; reordenação ↑↓
+- [x] **Gerador de sequência** — botão ListPlus em cada item abre painel inline; define prefixo + intervalo numérico (ex.: CT02–CT85); cria via API copiando todos os campos do item-modelo com zero-padding automático
 - [x] Por campo: tipo, unidade (NUMERIC), obrigatório, exige foto
 - [x] Execução (`/execucoes/[id]`): botões OK/NOK e Sim/Não, input numérico c/ unidade, texto
 - [x] **Foto por campo** — câmera no mobile, file picker no desktop → Cloudinary
@@ -308,6 +310,7 @@ recriação de ambiente. Detalhe do schema completo em `prisma/schema.prisma`.
   5.2  Versionamento legal + LegalGate
   6.1  Checklists: CRUD 3 níveis + execução + N/A + refs normativas + histórico + relatórios .docx + IA
   6.1+ Templates globais (ISO 9001:2015 em produção, 13 seções, 72 campos)
+  6.1+ Gerador de sequência de itens (CT01→CT85 com campos copiados via ListPlus)
   PWA  Ícones de instalação (icon-192/512, apple-touch-icon)
   DOC  ARCHITECTURE.md — mapa completo do sistema (APIs, fluxos, modelos, armadilhas)
 
