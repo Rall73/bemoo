@@ -24,12 +24,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!valid) return null
 
         return {
-          id:            String(user.id),
-          name:          user.name,
-          email:         user.email,
-          role:          user.role,
-          companyId:     user.companyId,
-          platformAdmin: user.platformAdmin,
+          id:                 String(user.id),
+          name:               user.name,
+          email:              user.email,
+          role:               user.role,
+          companyId:          user.companyId,
+          platformAdmin:      user.platformAdmin,
+          mustChangePassword: user.mustChangePassword,
         }
       },
     }),
@@ -43,7 +44,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
 
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session: updateSession }) {
+      // Atualização de sessão via useSession().update()
+      if (trigger === "update" && updateSession?.mustChangePassword !== undefined) {
+        token.mustChangePassword = updateSession.mustChangePassword
+        return token
+      }
+
       // Login com Google — buscar ou criar usuário no banco
       if (account?.provider === "google" && user?.email) {
         const dbUser = await prisma.user.findUnique({
@@ -52,10 +59,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (dbUser) {
           // Usuário já existe → preencher token com dados do banco
-          token.sub          = String(dbUser.id)
-          token.role         = dbUser.role
-          token.companyId    = dbUser.companyId
-          token.platformAdmin = dbUser.platformAdmin
+          token.sub               = String(dbUser.id)
+          token.role              = dbUser.role
+          token.companyId         = dbUser.companyId
+          token.platformAdmin     = dbUser.platformAdmin
+          token.mustChangePassword = dbUser.mustChangePassword
         } else {
           // Novo usuário via Google → criar empresa + usuário
           const nome = user.name ?? user.email.split("@")[0]
@@ -76,17 +84,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             })
           })
 
-          token.sub          = String(newUser.id)
-          token.role         = newUser.role
-          token.companyId    = newUser.companyId
-          token.platformAdmin = false
-          token.needsOnboarding = true
+          token.sub               = String(newUser.id)
+          token.role              = newUser.role
+          token.companyId         = newUser.companyId
+          token.platformAdmin     = false
+          token.mustChangePassword = false
+          token.needsOnboarding   = true
         }
       } else if (user) {
         // Login por credenciais — dados já vêm do authorize()
-        token.role          = (user as { role: string }).role
-        token.companyId     = (user as { companyId: number }).companyId
-        token.platformAdmin = (user as { platformAdmin: boolean }).platformAdmin ?? false
+        token.role               = (user as { role: string }).role
+        token.companyId          = (user as { companyId: number }).companyId
+        token.platformAdmin      = (user as { platformAdmin: boolean }).platformAdmin ?? false
+        token.mustChangePassword = (user as { mustChangePassword: boolean }).mustChangePassword ?? false
       }
 
       return token
@@ -94,10 +104,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
     session({ session, token }) {
       if (token && session.user) {
-        session.user.id            = token.sub ?? ""
-        session.user.role          = token.role as never
-        session.user.companyId     = token.companyId as number
-        session.user.platformAdmin = (token.platformAdmin as boolean) ?? false
+        session.user.id                 = token.sub ?? ""
+        session.user.role               = token.role as never
+        session.user.companyId          = token.companyId as number
+        session.user.platformAdmin      = (token.platformAdmin as boolean) ?? false
+        session.user.mustChangePassword = (token.mustChangePassword as boolean) ?? false
       }
       return session
     },

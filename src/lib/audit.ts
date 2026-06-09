@@ -8,6 +8,7 @@ export type AuditAction =
   | "logout"
   // Usuários
   | "usuario.criado"
+  | "usuario.criado_direto"
   | "usuario.editado"
   | "usuario.desativado"
   | "usuario.role_alterado"
@@ -29,6 +30,7 @@ export type AuditAction =
   // Senha
   | "senha.reset_solicitado"
   | "senha.reset_concluido"
+  | "senha.trocada_obrigatoria"
   // Checklists
   | "checklist.executado"
   | "checklist.importado_template"

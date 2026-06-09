@@ -58,10 +58,11 @@ model User {
   email         String    @unique
   password      String
   role          Role      @default(EXECUTOR)
-  platformAdmin Boolean   @default(false) @map("platform_admin")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  deletedAt     DateTime? @map("deleted_at")
-  deletedBy     Int?      @map("deleted_by")
+  platformAdmin       Boolean   @default(false) @map("platform_admin")
+  mustChangePassword  Boolean   @default(false) @map("must_change_password")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  deletedAt           DateTime? @map("deleted_at")
+  deletedBy           Int?      @map("deleted_by")
 
   company              Company              @relation(fields: [companyId], references: [id])
   legalAcceptances     LegalAcceptance[]

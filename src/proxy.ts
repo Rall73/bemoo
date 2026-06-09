@@ -23,6 +23,18 @@ export default auth((req) => {
   if (pathname.startsWith("/login") && isAuthenticated) {
     return NextResponse.redirect(new URL("/dashboard", req.url))
   }
+
+  // Usuário com senha temporária → forçar troca antes de qualquer outra rota
+  const mustChangePassword = (req.auth?.user as { mustChangePassword?: boolean })?.mustChangePassword
+  if (
+    isAuthenticated &&
+    mustChangePassword &&
+    !pathname.startsWith("/trocar-senha-obrigatoria") &&
+    !pathname.startsWith("/api/") &&
+    !isPublicRoute
+  ) {
+    return NextResponse.redirect(new URL("/trocar-senha-obrigatoria", req.url))
+  }
 })
 
 export const config = {

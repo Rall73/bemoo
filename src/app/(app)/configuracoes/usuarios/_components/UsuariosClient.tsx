@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { UserPlus, RotateCcw, Trash2, X, Mail, Shield, ChevronDown } from "lucide-react"
+import { UserPlus, RotateCcw, Trash2, X, Mail, Shield, ChevronDown, KeyRound, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 
@@ -160,6 +160,188 @@ function InviteModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   )
 }
 
+// ─── Modal de criação direta ──────────────────────────────────────
+
+function CriarUsuarioModal({
+  onClose,
+  onSuccess,
+}: {
+  onClose:   () => void
+  onSuccess: (msg: string, senha: string, email: string) => void
+}) {
+  const [name,        setName]        = useState("")
+  const [email,       setEmail]       = useState("")
+  const [role,        setRole]        = useState<Role>("EXECUTOR")
+  const [loading,     setLoading]     = useState(false)
+  const [errors,      setErrors]      = useState<Record<string, string>>({})
+  const [globalError, setGlobalError] = useState("")
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setGlobalError("")
+    setErrors({})
+
+    setLoading(true)
+    try {
+      const res = await fetch("/api/usuarios/direto", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ name: name.trim(), email: email.trim().toLowerCase(), role }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        if (json.errors) {
+          const mapped: Record<string, string> = {}
+          for (const [k, v] of Object.entries(json.errors)) mapped[k] = (v as string[])[0]
+          setErrors(mapped)
+        } else {
+          setGlobalError(json.message ?? "Erro ao criar usuário.")
+        }
+        return
+      }
+      onSuccess(json.message ?? "Usuário criado.", json.senhaTemporaria, email.trim().toLowerCase())
+    } catch {
+      setGlobalError("Erro de conexão. Tente novamente.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-round border border-gray-200 shadow-2xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-semibold text-gray-900">Criar usuário com senha</h2>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-soft hover:bg-gray-100">
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-500 mb-4">
+          Uma senha temporária será gerada. O usuário deverá criar a própria senha no primeiro acesso.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Nome completo"
+            type="text"
+            value={name}
+            onChange={(e) => { setName(e.target.value); setErrors({}) }}
+            placeholder="Nome do colaborador"
+            error={errors.name}
+            required
+            autoFocus
+          />
+          <Input
+            label="E-mail"
+            type="email"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setErrors({}) }}
+            placeholder="colaborador@empresa.com"
+            icon={<Mail size={16} />}
+            error={errors.email}
+            required
+          />
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Papel</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as Role)}
+              className="w-full px-3 py-2 text-sm text-gray-800 bg-white border border-gray-300 rounded-soft focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              {(Object.entries(ROLE_CONFIG) as [Role, typeof ROLE_CONFIG[Role]][]).map(([key, { label, desc }]) => (
+                <option key={key} value={key}>{label} — {desc}</option>
+              ))}
+            </select>
+          </div>
+
+          {globalError && (
+            <p className="text-xs text-error bg-red-50 border border-red-100 rounded-soft px-3 py-2">
+              {globalError}
+            </p>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button type="button" variant="secondary" size="md" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="primary" size="md" loading={loading}>
+              Criar usuário
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Modal de exibição da senha temporária ────────────────────────
+
+function SenhaTemporariaModal({
+  senha,
+  email,
+  onClose,
+}: {
+  senha:   string
+  email:   string
+  onClose: () => void
+}) {
+  const [copiado, setCopiado] = useState(false)
+
+  function copiar() {
+    navigator.clipboard.writeText(senha).then(() => {
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2000)
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-round border border-gray-200 shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center flex-shrink-0">
+            <KeyRound size={20} className="text-primary" strokeWidth={2} />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Usuário criado</h2>
+            <p className="text-xs text-gray-500">Anote a senha antes de fechar</p>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-500 mb-3">
+          Repasse as credenciais abaixo para <span className="font-medium text-gray-700">{email}</span>.
+          Na primeira entrada, ele será solicitado a criar uma senha definitiva.
+        </p>
+
+        <div className="bg-gray-50 border border-gray-200 rounded-soft p-3 mb-4">
+          <p className="text-[11px] text-gray-400 mb-1">Senha temporária</p>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-lg font-semibold text-gray-900 tracking-wider select-all">
+              {senha}
+            </span>
+            <button
+              onClick={copiar}
+              className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-soft transition-colors flex-shrink-0"
+              title="Copiar senha"
+            >
+              {copiado ? <Check size={15} strokeWidth={2} className="text-green-600" /> : <Copy size={15} strokeWidth={2} />}
+            </button>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-yellow-700 bg-yellow-50 border border-yellow-100 rounded-soft px-3 py-2 mb-4">
+          Esta senha não será exibida novamente após fechar este aviso.
+        </p>
+
+        <Button variant="primary" size="md" className="w-full" onClick={onClose}>
+          Entendido, fechar
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Dialog de confirmação ─────────────────────────────────────────
 
 function ConfirmDialog({
@@ -200,12 +382,14 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
   const router = useRouter()
   const [, startTransition] = useTransition()
 
-  const [showInviteModal,  setShowInviteModal]  = useState(false)
+  const [showInviteModal,   setShowInviteModal]   = useState(false)
+  const [showCriarModal,    setShowCriarModal]    = useState(false)
+  const [senhaTemporaria,   setSenhaTemporaria]   = useState<{ senha: string; email: string } | null>(null)
   const [confirmDeactivate, setConfirmDeactivate] = useState<Usuario | null>(null)
   const [confirmCancelInvite, setConfirmCancelInvite] = useState<Invite | null>(null)
-  const [actionLoading,    setActionLoading]    = useState<string | null>(null)
-  const [roleLoading,      setRoleLoading]      = useState<number | null>(null)
-  const [feedback,         setFeedback]         = useState("")
+  const [actionLoading,     setActionLoading]     = useState<string | null>(null)
+  const [roleLoading,       setRoleLoading]       = useState<number | null>(null)
+  const [feedback,          setFeedback]          = useState("")
 
   function refresh() {
     startTransition(() => router.refresh())
@@ -278,6 +462,24 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
           onSuccess={(msg) => { setShowInviteModal(false); showFeedback(msg); refresh() }}
         />
       )}
+      {showCriarModal && (
+        <CriarUsuarioModal
+          onClose={() => setShowCriarModal(false)}
+          onSuccess={(msg, senha, email) => {
+            setShowCriarModal(false)
+            showFeedback(msg)
+            setSenhaTemporaria({ senha, email })
+            refresh()
+          }}
+        />
+      )}
+      {senhaTemporaria && (
+        <SenhaTemporariaModal
+          senha={senhaTemporaria.senha}
+          email={senhaTemporaria.email}
+          onClose={() => setSenhaTemporaria(null)}
+        />
+      )}
       {confirmDeactivate && (
         <ConfirmDialog
           title={`Desativar ${confirmDeactivate.name}?`}
@@ -327,18 +529,30 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
           </div>
           {isAdmin && (
             <div className="flex flex-col items-end gap-1">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => userLimit === null || activeCount < userLimit ? setShowInviteModal(true) : null}
-                disabled={userLimit !== null && activeCount >= userLimit}
-                title={userLimit !== null && activeCount >= userLimit
-                  ? `Limite de ${userLimit} usuários atingido. Entre em contato para upgrade.`
-                  : undefined}
-              >
-                <UserPlus size={16} strokeWidth={2} />
-                Convidar pessoa
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={() => userLimit === null || activeCount < userLimit ? setShowCriarModal(true) : null}
+                  disabled={userLimit !== null && activeCount >= userLimit}
+                  title="Criar usuário com senha temporária (para quando e-mail não funciona)"
+                >
+                  <KeyRound size={16} strokeWidth={2} />
+                  Criar com senha
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => userLimit === null || activeCount < userLimit ? setShowInviteModal(true) : null}
+                  disabled={userLimit !== null && activeCount >= userLimit}
+                  title={userLimit !== null && activeCount >= userLimit
+                    ? `Limite de ${userLimit} usuários atingido. Entre em contato para upgrade.`
+                    : undefined}
+                >
+                  <UserPlus size={16} strokeWidth={2} />
+                  Convidar pessoa
+                </Button>
+              </div>
               {userLimit !== null && activeCount >= userLimit && (
                 <p className="text-[11px] text-gray-400">
                   Limite do plano atingido — entre em contato para upgrade
@@ -506,10 +720,16 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
         {users.length === 1 && invites.length === 0 && isAdmin && (
           <div className="text-center py-10 text-gray-400">
             <p className="text-sm mb-3">Sua equipe está só com você por enquanto.</p>
-            <Button variant="ghost" size="sm" onClick={() => setShowInviteModal(true)}>
-              <UserPlus size={15} strokeWidth={2} />
-              Convidar o primeiro colaborador
-            </Button>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <Button variant="ghost" size="sm" onClick={() => setShowCriarModal(true)}>
+                <KeyRound size={15} strokeWidth={2} />
+                Criar com senha
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowInviteModal(true)}>
+                <UserPlus size={15} strokeWidth={2} />
+                Convidar o primeiro colaborador
+              </Button>
+            </div>
           </div>
         )}
       </div>

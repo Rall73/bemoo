@@ -6,6 +6,7 @@ declare module "next-auth" {
     role: string
     companyId: number
     platformAdmin: boolean
+    mustChangePassword: boolean
   }
   interface Session {
     user: {
@@ -15,6 +16,7 @@ declare module "next-auth" {
       role: string
       companyId: number
       platformAdmin: boolean
+      mustChangePassword: boolean
     }
   }
 }
@@ -24,5 +26,6 @@ declare module "next-auth/jwt" {
     role: string
     companyId: number
     platformAdmin: boolean
+    mustChangePassword: boolean
   }
 }

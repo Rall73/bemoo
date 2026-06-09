@@ -48,6 +48,12 @@ export const zConviteSchema = z.object({
   role:  z.enum(["ADMIN", "GESTOR", "EXECUTOR", "AUDITOR"]),
 })
 
+export const zCriarUsuarioDiretoSchema = z.object({
+  name:  zNome,
+  email: zEmail,
+  role:  z.enum(["ADMIN", "GESTOR", "EXECUTOR", "AUDITOR"]),
+})
+
 export const zResetSenhaSchema = z.object({
   email: zEmail,
 })
