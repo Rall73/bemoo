@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { UserPlus, RotateCcw, Trash2, X, Mail, Shield, ChevronDown, KeyRound, Copy, Check } from "lucide-react"
+import { UserPlus, RotateCcw, Trash2, X, Mail, Shield, ChevronDown, KeyRound, Copy, Check, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 
@@ -440,6 +440,23 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
     finally { setActionLoading(null); setConfirmCancelInvite(null) }
   }
 
+  // ── Resetar senha ────────────────────────────────────────────────
+
+  async function handleResetarSenha(user: Usuario) {
+    setActionLoading(`reset-${user.id}`)
+    try {
+      const res  = await fetch(`/api/usuarios/${user.id}/resetar-senha`, { method: "POST" })
+      const json = await res.json()
+      if (res.ok) {
+        setSenhaTemporaria({ senha: json.data?.senhaTemporaria ?? "", email: user.email })
+        showFeedback(json.data?.message ?? "Senha resetada.")
+      } else {
+        showFeedback(json.message ?? json.data?.message ?? "Erro ao resetar senha.")
+      }
+    } catch { showFeedback("Erro de conexão.") }
+    finally { setActionLoading(null) }
+  }
+
   // ── Reenviar convite ─────────────────────────────────────────────
 
   async function handleResendInvite(inviteId: number) {
@@ -624,14 +641,24 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
 
                   {/* Ações */}
                   {isAdmin && !isMe && (
-                    <button
-                      onClick={() => setConfirmDeactivate(user)}
-                      disabled={actionLoading === `deactivate-${user.id}`}
-                      title="Desativar usuário"
-                      className="p-1.5 text-gray-400 hover:text-error hover:bg-red-50 rounded-soft transition-colors flex-shrink-0 disabled:opacity-40"
-                    >
-                      <Trash2 size={15} strokeWidth={2} />
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => handleResetarSenha(user)}
+                        disabled={!!actionLoading}
+                        title="Resetar senha (gera nova senha temporária)"
+                        className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-soft transition-colors disabled:opacity-40"
+                      >
+                        <RefreshCw size={14} strokeWidth={2} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeactivate(user)}
+                        disabled={actionLoading === `deactivate-${user.id}`}
+                        title="Desativar usuário"
+                        className="p-1.5 text-gray-400 hover:text-error hover:bg-red-50 rounded-soft transition-colors disabled:opacity-40"
+                      >
+                        <Trash2 size={15} strokeWidth={2} />
+                      </button>
+                    </div>
                   )}
                 </div>
               )

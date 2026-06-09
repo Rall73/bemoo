@@ -12,6 +12,7 @@ export type AuditAction =
   | "usuario.editado"
   | "usuario.desativado"
   | "usuario.role_alterado"
+  | "usuario.senha_resetada"
   // Convites
   | "convite.enviado"
   | "convite.reenviado"
