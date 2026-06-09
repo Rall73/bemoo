@@ -195,11 +195,11 @@ function CriarUsuarioModal({
           for (const [k, v] of Object.entries(json.errors)) mapped[k] = (v as string[])[0]
           setErrors(mapped)
         } else {
-          setGlobalError(json.message ?? "Erro ao criar usuário.")
+          setGlobalError(json.message ?? json.data?.message ?? "Erro ao criar usuário.")
         }
         return
       }
-      onSuccess(json.message ?? "Usuário criado.", json.senhaTemporaria, email.trim().toLowerCase())
+      onSuccess(json.data?.message ?? "Usuário criado.", json.data?.senhaTemporaria ?? "", email.trim().toLowerCase())
     } catch {
       setGlobalError("Erro de conexão. Tente novamente.")
     } finally {
