@@ -33,8 +33,8 @@ export default function ModulosPage() {
         const res = await fetch(`/api/plataforma/empresas/${companyId}/modulos`)
         if (res.ok) {
           const json = await res.json()
-          setEnabled(new Set(json.enabledModules as string[]))
-          setCompanyName(json.companyName ?? "")
+          setEnabled(new Set(json.data.enabledModules as string[]))
+          setCompanyName(json.data.companyName ?? "")
         }
       } catch {
         setError("Erro ao carregar módulos.")
