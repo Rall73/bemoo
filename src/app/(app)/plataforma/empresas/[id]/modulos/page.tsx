@@ -3,16 +3,17 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, LayoutGrid, CheckSquare, AlertTriangle, Tag, Target, Inbox } from "lucide-react"
+import { ArrowLeft, LayoutGrid, CheckSquare, AlertTriangle, Tag, Target, Inbox, Wrench } from "lucide-react"
 import { MODULES_CONFIG } from "@/lib/modules"
 
-const MODULE_ICONS = {
+const MODULE_ICONS: Record<string, React.ElementType> = {
   checklists:      CheckSquare,
   intercorrencias: AlertTriangle,
   rastreabilidade: Tag,
   planos:          Target,
   captura:         Inbox,
-} as const
+  oficina:         Wrench,
+}
 
 export default function ModulosPage() {
   const router   = useRouter()
@@ -105,7 +106,7 @@ export default function ModulosPage() {
       ) : (
         <div className="bg-white border border-gray-200 rounded-round divide-y divide-gray-100">
           {MODULES_CONFIG.map((mod) => {
-            const Icon       = MODULE_ICONS[mod.key as keyof typeof MODULE_ICONS]
+            const Icon       = MODULE_ICONS[mod.key] ?? LayoutGrid
             const isEnabled  = enabled.has(mod.key)
             const isToggling = toggling === mod.key
 
