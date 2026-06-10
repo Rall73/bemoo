@@ -3,8 +3,9 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { CheckCircle, Clock, ListChecks, ChevronRight, Search } from "lucide-react"
+import { CheckCircle, Clock, ListChecks, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ExecucoesInProgress } from "./_components/ExecucoesInProgress"
 
 export const metadata: Metadata = { title: "Histórico de execuções" }
 
@@ -22,18 +23,26 @@ export default async function ExecucoesPage() {
 
   const companyId = session.user.companyId as number
 
-  const executions = await prisma.checklistExecution.findMany({
-    where: { companyId, deletedAt: null, status: "COMPLETED" },
-    include: {
-      checklist: { select: { name: true } },
-      executor:  { select: { name: true } },
-      fieldValues: {
-        select: { valueOkNok: true, valueNa: true },
+  const [inProgress, completed] = await Promise.all([
+    prisma.checklistExecution.findMany({
+      where:   { companyId, deletedAt: null, status: "IN_PROGRESS" },
+      include: {
+        checklist: { select: { name: true } },
+        executor:  { select: { name: true } },
       },
-    },
-    orderBy: { finishedAt: "desc" },
-    take: 100,
-  })
+      orderBy: { startedAt: "desc" },
+    }),
+    prisma.checklistExecution.findMany({
+      where:   { companyId, deletedAt: null, status: "COMPLETED" },
+      include: {
+        checklist: { select: { name: true } },
+        executor:  { select: { name: true } },
+        fieldValues: { select: { valueOkNok: true, valueNa: true } },
+      },
+      orderBy: { finishedAt: "desc" },
+      take: 100,
+    }),
+  ])
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -43,83 +52,103 @@ export default async function ExecucoesPage() {
             Histórico
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {executions.length} execuç{executions.length === 1 ? "ão" : "ões"} concluída{executions.length === 1 ? "" : "s"}.
+            {completed.length} execuç{completed.length === 1 ? "ão" : "ões"} concluída{completed.length === 1 ? "" : "s"}
+            {inProgress.length > 0 && ` · ${inProgress.length} em andamento`}.
           </p>
         </div>
       </div>
 
-      {executions.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <ListChecks size={36} className="mx-auto mb-3 opacity-30" strokeWidth={1.5} />
-          <p className="text-sm">Nenhuma execução concluída ainda.</p>
-          <Link href="/checklists" className="mt-2 text-sm text-primary hover:underline block">
-            Ir para Checklists
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {executions.map((ex) => {
-            const durationMins = ex.finishedAt
-              ? Math.round((ex.finishedAt.getTime() - ex.startedAt.getTime()) / 1000 / 60)
-              : null
+      <div className="space-y-6">
+        {/* Execuções em andamento */}
+        <ExecucoesInProgress
+          executions={inProgress.map((ex) => ({
+            id:            ex.id,
+            checklistName: ex.checklist.name,
+            executorName:  ex.executor.name,
+            startedAt:     ex.startedAt.toISOString(),
+          }))}
+        />
 
-            const boolFields = ex.fieldValues.filter((fv) => !fv.valueNa)
-            const conformes  = boolFields.filter((fv) => fv.valueOkNok === true).length
-            const naoConf    = boolFields.filter((fv) => fv.valueOkNok === false).length
-            const totalBool  = boolFields.filter((fv) => fv.valueOkNok !== null).length
-            const pct        = totalBool > 0 ? Math.round((conformes / totalBool) * 100) : null
-            const codigoExec = `EXE-${String(ex.id).padStart(5, "0")}`
+        {/* Execuções concluídas */}
+        {completed.length > 0 && (
+          <div className="space-y-2">
+            {inProgress.length > 0 && (
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-0.5">Concluídas</p>
+            )}
+            {completed.map((ex) => {
+              const durationMins = ex.finishedAt
+                ? Math.round((ex.finishedAt.getTime() - ex.startedAt.getTime()) / 1000 / 60)
+                : null
 
-            return (
-              <Link
-                key={ex.id}
-                href={`/execucoes/${ex.id}/resultado`}
-                className="flex items-center gap-4 bg-white border border-gray-200 rounded-round p-4 hover:border-gray-300 transition-colors group"
-              >
-                <div className={cn(
-                  "w-9 h-9 rounded-soft flex items-center justify-center flex-shrink-0",
-                  naoConf > 0 ? "bg-red-50" : "bg-success/10"
-                )}>
-                  <CheckCircle size={18}
-                    className={naoConf > 0 ? "text-error" : "text-success"}
-                    strokeWidth={2} />
-                </div>
+              const boolFields = ex.fieldValues.filter((fv) => !fv.valueNa)
+              const conformes  = boolFields.filter((fv) => fv.valueOkNok === true).length
+              const naoConf    = boolFields.filter((fv) => fv.valueOkNok === false).length
+              const totalBool  = boolFields.filter((fv) => fv.valueOkNok !== null).length
+              const pct        = totalBool > 0 ? Math.round((conformes / totalBool) * 100) : null
+              const codigoExec = `EXE-${String(ex.id).padStart(5, "0")}`
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium text-gray-900 truncate">{ex.checklist.name}</p>
-                    <span className="text-[10px] font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200">
-                      {codigoExec}
-                    </span>
+              return (
+                <Link
+                  key={ex.id}
+                  href={`/execucoes/${ex.id}/resultado`}
+                  className="flex items-center gap-4 bg-white border border-gray-200 rounded-round p-4 hover:border-gray-300 transition-colors group"
+                >
+                  <div className={cn(
+                    "w-9 h-9 rounded-soft flex items-center justify-center flex-shrink-0",
+                    naoConf > 0 ? "bg-red-50" : "bg-success/10"
+                  )}>
+                    <CheckCircle size={18}
+                      className={naoConf > 0 ? "text-error" : "text-success"}
+                      strokeWidth={2} />
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {ex.executor.name} · {ex.finishedAt ? fmtDate(ex.finishedAt) : "—"}
-                  </p>
-                </div>
 
-                <div className="flex items-center gap-3 text-xs text-gray-400 flex-shrink-0">
-                  {pct !== null && (
-                    <span className={cn(
-                      "font-semibold px-2 py-0.5 rounded",
-                      pct === 100 ? "text-success bg-green-50" :
-                      naoConf > 0 ? "text-error bg-red-50" : "text-gray-600"
-                    )}>
-                      {pct}%
-                    </span>
-                  )}
-                  {durationMins !== null && (
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} />
-                      {durationMins < 60 ? `${durationMins}min` : `${Math.floor(durationMins/60)}h${durationMins%60}m`}
-                    </span>
-                  )}
-                  <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium text-gray-900 truncate">{ex.checklist.name}</p>
+                      <span className="text-[10px] font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200">
+                        {codigoExec}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {ex.executor.name} · {ex.finishedAt ? fmtDate(ex.finishedAt) : "—"}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-gray-400 flex-shrink-0">
+                    {pct !== null && (
+                      <span className={cn(
+                        "font-semibold px-2 py-0.5 rounded",
+                        pct === 100 ? "text-success bg-green-50" :
+                        naoConf > 0 ? "text-error bg-red-50" : "text-gray-600"
+                      )}>
+                        {pct}%
+                      </span>
+                    )}
+                    {durationMins !== null && (
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} />
+                        {durationMins < 60 ? `${durationMins}min` : `${Math.floor(durationMins/60)}h${durationMins%60}m`}
+                      </span>
+                    )}
+                    <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {inProgress.length === 0 && completed.length === 0 && (
+          <div className="text-center py-16 text-gray-400">
+            <ListChecks size={36} className="mx-auto mb-3 opacity-30" strokeWidth={1.5} />
+            <p className="text-sm">Nenhuma execução ainda.</p>
+            <Link href="/checklists" className="mt-2 text-sm text-primary hover:underline block">
+              Ir para Checklists
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

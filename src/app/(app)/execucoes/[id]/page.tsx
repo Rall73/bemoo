@@ -38,12 +38,12 @@ export default async function ExecucaoPage({
         },
       },
       fieldValues: true,
+      itemNotes:   true,
     },
   })
 
   if (!execution) notFound()
 
-  // Se já finalizada, redireciona para o histórico
   if (execution.status === "COMPLETED") redirect(`/execucoes/${execId}/resultado`)
 
   return (
@@ -55,8 +55,9 @@ export default async function ExecucaoPage({
           executorName:  execution.executor.name,
           startedAt:     execution.startedAt.toISOString(),
           items: execution.checklist.items.map((item) => ({
-            id:    item.id,
-            label: item.label,
+            id:           item.id,
+            label:        item.label,
+            requirePhoto: item.fields.some((f) => f.requirePhoto),
             fields: item.fields.map((f) => ({
               id:              f.id,
               label:           f.label,
@@ -70,16 +71,20 @@ export default async function ExecucaoPage({
               referenceSource: f.referenceSource ?? null,
             })),
           })),
-          // valores já salvos (se houver auto-save futuro)
           savedValues: execution.fieldValues.reduce((acc, fv) => {
             acc[fv.fieldId] = {
-              valueOkNok:    fv.valueOkNok,
-              valueNumeric:  fv.valueNumeric ? Number(fv.valueNumeric) : null,
-              valueText:     fv.valueText,
-              valueNa:       fv.valueNa,
-              photoUrl:      fv.photoUrl,
-              annotation:    fv.annotation,
-              transcription: fv.transcription,
+              valueOkNok:   fv.valueOkNok,
+              valueNumeric: fv.valueNumeric ? Number(fv.valueNumeric) : null,
+              valueText:    fv.valueText,
+              valueNa:      fv.valueNa,
+            }
+            return acc
+          }, {} as Record<number, any>),
+          savedItemNotes: execution.itemNotes.reduce((acc, n) => {
+            acc[n.itemId] = {
+              photoUrl:      n.photoUrl,
+              annotation:    n.annotation,
+              transcription: n.transcription,
             }
             return acc
           }, {} as Record<number, any>),

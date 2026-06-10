@@ -5,11 +5,15 @@ import { logAction } from "@/lib/audit"
 import { getIp } from "@/lib/audit"
 
 const zFieldValue = z.object({
-  fieldId:       z.number().int().positive(),
-  valueOkNok:    z.boolean().nullable().optional(),
-  valueNumeric:  z.number().nullable().optional(),
-  valueText:     z.string().max(2000).nullable().optional(),
-  valueNa:       z.boolean().optional(),
+  fieldId:      z.number().int().positive(),
+  valueOkNok:   z.boolean().nullable().optional(),
+  valueNumeric: z.number().nullable().optional(),
+  valueText:    z.string().max(2000).nullable().optional(),
+  valueNa:      z.boolean().optional(),
+})
+
+const zItemNote = z.object({
+  itemId:        z.number().int().positive(),
   photoUrl:      z.string().url().nullable().optional(),
   annotation:    z.string().max(2000).nullable().optional(),
   transcription: z.string().max(5000).nullable().optional(),
@@ -17,6 +21,7 @@ const zFieldValue = z.object({
 
 const zFinalizar = z.object({
   fieldValues:    z.array(zFieldValue),
+  itemNotes:      z.array(zItemNote).optional(),
   conclusionNote: z.string().max(5000).nullable().optional(),
 })
 
@@ -41,12 +46,12 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
                 where:   { deletedAt: null },
                 orderBy: { order: "asc" },
                 select:  {
-                  id:          true,
-                  label:       true,
-                  type:        true,
-                  required:    true,
-                  requirePhoto:true,
-                  allowNa:     true,
+                  id:           true,
+                  label:        true,
+                  type:         true,
+                  required:     true,
+                  requirePhoto: true,
+                  allowNa:      true,
                 },
               },
             },
@@ -65,17 +70,14 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
     return badRequest("Esta execução já foi finalizada.")
   }
 
-  // Valida campos obrigatórios
   const allFields = execution.checklist.items.flatMap((i) => i.fields)
   const submitted = new Map(data.fieldValues.map((fv) => [fv.fieldId, fv]))
 
+  // Valida campos obrigatórios
   for (const field of allFields) {
     if (!field.required) continue
     const val = submitted.get(field.id)
-    if (!val) {
-      return badRequest(`Campo obrigatório não preenchido: "${field.label}"`)
-    }
-    // N/A satisfaz qualquer campo obrigatório (quando allowNa está habilitado)
+    if (!val) return badRequest(`Campo obrigatório não preenchido: "${field.label}"`)
     if (val.valueNa && field.allowNa) continue
 
     if (field.type === "OK_NOK" || field.type === "SIM_NAO") {
@@ -89,40 +91,55 @@ export const POST = withAuthCtx<{ id: string }>(async (req, session, params) => 
     if (field.type === "TEXT" && !val.valueText?.trim()) {
       return badRequest(`Campo obrigatório não preenchido: "${field.label}"`)
     }
-    if (field.requirePhoto && !val.photoUrl) {
-      return badRequest(`Foto obrigatória para o campo: "${field.label}"`)
+  }
+
+  // Valida foto obrigatória por item (se algum campo do item exige foto)
+  const submittedNotes = new Map((data.itemNotes ?? []).map((n) => [n.itemId, n]))
+  for (const item of execution.checklist.items) {
+    const needsPhoto = item.fields.some((f) => f.requirePhoto)
+    if (needsPhoto && !submittedNotes.get(item.id)?.photoUrl) {
+      return badRequest(`Foto obrigatória no item: "${item.label}"`)
     }
   }
 
-  // Upsert de todos os valores em transação
+  // Upsert em transação
   await prisma.$transaction([
-    // Salva cada valor
     ...data.fieldValues.map((fv) =>
       prisma.executionFieldValue.upsert({
         where:  { executionId_fieldId: { executionId: id, fieldId: fv.fieldId } },
         create: {
-          executionId:   id,
-          fieldId:       fv.fieldId,
-          valueOkNok:    fv.valueNa ? null : (fv.valueOkNok ?? null),
-          valueNumeric:  fv.valueNa ? null : (fv.valueNumeric != null ? fv.valueNumeric : null),
-          valueText:     fv.valueNa ? null : (fv.valueText ?? null),
-          valueNa:       fv.valueNa ?? false,
-          photoUrl:      fv.photoUrl     ?? null,
-          annotation:    fv.annotation   ?? null,
-          transcription: fv.transcription ?? null,
+          executionId:  id,
+          fieldId:      fv.fieldId,
+          valueOkNok:   fv.valueNa ? null : (fv.valueOkNok ?? null),
+          valueNumeric: fv.valueNa ? null : (fv.valueNumeric != null ? fv.valueNumeric : null),
+          valueText:    fv.valueNa ? null : (fv.valueText ?? null),
+          valueNa:      fv.valueNa ?? false,
         },
         update: {
-          valueOkNok:    fv.valueNa ? null : (fv.valueOkNok ?? null),
-          valueNumeric:  fv.valueNa ? null : (fv.valueNumeric != null ? fv.valueNumeric : null),
-          valueText:     fv.valueNa ? null : (fv.valueText ?? null),
-          valueNa:       fv.valueNa ?? false,
-          photoUrl:      fv.photoUrl     ?? null,
-          annotation:    fv.annotation   ?? null,
-          transcription: fv.transcription ?? null,
+          valueOkNok:   fv.valueNa ? null : (fv.valueOkNok ?? null),
+          valueNumeric: fv.valueNa ? null : (fv.valueNumeric != null ? fv.valueNumeric : null),
+          valueText:    fv.valueNa ? null : (fv.valueText ?? null),
+          valueNa:      fv.valueNa ?? false,
         },
       })
     ),
-    // Finaliza a execução
+    ...(data.itemNotes ?? []).map((note) =>
+      prisma.executionItemNote.upsert({
+        where:  { executionId_itemId: { executionId: id, itemId: note.itemId } },
+        create: {
+          executionId:   id,
+          itemId:        note.itemId,
+          photoUrl:      note.photoUrl      ?? null,
+          annotation:    note.annotation    ?? null,
+          transcription: note.transcription ?? null,
+        },
+        update: {
+          photoUrl:      note.photoUrl      ?? null,
+          annotation:    note.annotation    ?? null,
+          transcription: note.transcription ?? null,
+        },
+      })
+    ),
     prisma.checklistExecution.update({
       where: { id },
       data: {

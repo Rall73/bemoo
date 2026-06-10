@@ -217,8 +217,9 @@ model ChecklistItem {
   deletedAt   DateTime? @map("deleted_at")
   deletedBy   Int?      @map("deleted_by")
 
-  checklist Checklist           @relation(fields: [checklistId], references: [id])
-  fields    ChecklistItemField[]
+  checklist  Checklist            @relation(fields: [checklistId], references: [id])
+  fields     ChecklistItemField[]
+  itemNotes  ExecutionItemNote[]
 
   @@index([checklistId])
   @@map("checklist_items")
@@ -263,10 +264,11 @@ model ChecklistExecution {
   deletedAt         DateTime?       @map("deleted_at")
   deletedBy         Int?            @map("deleted_by")
 
-  checklist   Checklist            @relation(fields: [checklistId], references: [id])
-  company     Company              @relation(fields: [companyId], references: [id])
-  executor    User                 @relation("ChecklistExecutor", fields: [executedBy], references: [id])
+  checklist   Checklist             @relation(fields: [checklistId], references: [id])
+  company     Company               @relation(fields: [companyId], references: [id])
+  executor    User                  @relation("ChecklistExecutor", fields: [executedBy], references: [id])
   fieldValues ExecutionFieldValue[]
+  itemNotes   ExecutionItemNote[]
 
   @@index([companyId])
   @@index([checklistId])
@@ -295,6 +297,25 @@ model ExecutionFieldValue {
   @@unique([executionId, fieldId])
   @@index([executionId])
   @@map("execution_field_values")
+}
+
+// Foto/áudio/anotação registrados por item (não por campo)
+model ExecutionItemNote {
+  id            Int      @id @default(autoincrement())
+  executionId   Int      @map("execution_id")
+  itemId        Int      @map("item_id")
+  photoUrl      String?  @db.VarChar(500) @map("photo_url")
+  annotation    String?  @db.Text
+  transcription String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  execution ChecklistExecution @relation(fields: [executionId], references: [id])
+  item      ChecklistItem      @relation(fields: [itemId], references: [id])
+
+  @@unique([executionId, itemId])
+  @@index([executionId])
+  @@map("execution_item_notes")
 }
 
 // ─── Oficina ─────────────────────────────────────────────────────

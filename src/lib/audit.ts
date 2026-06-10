@@ -34,6 +34,7 @@ export type AuditAction =
   | "senha.trocada_obrigatoria"
   // Checklists
   | "checklist.executado"
+  | "checklist.excluido"
   | "checklist.importado_template"
   // Oficina — master data
   | "oficina.area.criada"
