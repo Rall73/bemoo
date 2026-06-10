@@ -1,16 +1,17 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { MODULES_CONFIG } from "@/lib/modules"
-import { CheckSquare, AlertTriangle, Tag, Target, Inbox, ArrowRight } from "lucide-react"
+import { CheckSquare, AlertTriangle, Tag, Target, Inbox, Wrench, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
-const MODULE_ICONS = {
+const MODULE_ICONS: Record<string, React.ElementType> = {
   checklists:      CheckSquare,
   intercorrencias: AlertTriangle,
   rastreabilidade: Tag,
   planos:          Target,
   captura:         Inbox,
-} as const
+  oficina:         Wrench,
+}
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -41,7 +42,7 @@ export default async function DashboardPage() {
       {enabledModules.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {enabledModules.map((mod) => {
-            const Icon = MODULE_ICONS[mod.key as keyof typeof MODULE_ICONS]
+            const Icon = MODULE_ICONS[mod.key] ?? ArrowRight
             return (
               <Link
                 key={mod.key}

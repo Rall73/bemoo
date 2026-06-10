@@ -41,4 +41,5 @@ export const MODULE_ICONS = {
   rastreabilidade: "tag",
   planos:          "target",
   captura:         "inbox",
+  oficina:         "wrench",
 } as const
