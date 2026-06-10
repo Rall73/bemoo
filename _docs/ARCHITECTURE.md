@@ -384,6 +384,7 @@ Verificado no layout do grupo de rotas correspondente.
 | Key | Rota principal | Status |
 |---|---|---|
 | `checklists` | `/checklists` | ✅ Em produção |
+| `oficina` | `/oficina` | ✅ Em produção |
 | `intercorrencias` | `/intercorrencias` | ⏳ Fase 6.2 |
 | `rastreabilidade` | `/rastreabilidade` | ⏳ Fase 6.3 |
 | `planos` | `/planos` | ⏳ Fase 6.4 |

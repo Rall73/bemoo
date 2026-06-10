@@ -7,7 +7,7 @@
 
 ## Estado atual
 
-**Em produção:** sistema de checklists completo (módulo 6.1)
+**Em produção:** sistema de checklists completo (módulo 6.1) + Oficina (módulo 6.6)
 - CRUD de modelos (3 níveis: checklist → seção → campo)
 - Execução com foto, áudio (Whisper), N/A, refs normativas
 - Relatórios .docx (básico e com análise IA via GPT)

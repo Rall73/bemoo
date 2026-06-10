@@ -6,9 +6,10 @@ import { signOut } from "next-auth/react"
 import { BemooLogo } from "@/components/Logo"
 import { MODULES_CONFIG } from "@/lib/modules"
 import {
-  CheckSquare, AlertTriangle, Tag, Target, Inbox,
+  CheckSquare, AlertTriangle, Tag, Target, Inbox, Wrench,
   LayoutDashboard, LogOut, ChevronRight, Users,
   Building2, BarChart2, ScrollText, UserCircle, X, Layers, History,
+  Package, Settings2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -18,6 +19,7 @@ const MODULE_ICONS = {
   rastreabilidade: Tag,
   planos:          Target,
   captura:         Inbox,
+  oficina:         Wrench,
 } as const
 
 interface NavSidebarProps {
@@ -89,6 +91,14 @@ export function NavSidebar({ user, enabledModules, onClose }: NavSidebarProps) {
                       onClick={handleLinkClick}
                       indent
                     />
+                  )}
+                  {/* Sub-links do módulo oficina */}
+                  {mod.key === "oficina" && (
+                    <>
+                      <NavLink href="/oficina/pedidos"   icon={CheckSquare} label="Pedidos"   current={pathname} onClick={handleLinkClick} indent />
+                      <NavLink href="/oficina/estoque"   icon={Package}     label="Estoque"   current={pathname} onClick={handleLinkClick} indent />
+                      <NavLink href="/oficina/cadastros" icon={Settings2}   label="Cadastros" current={pathname} onClick={handleLinkClick} indent />
+                    </>
                   )}
                 </div>
               )

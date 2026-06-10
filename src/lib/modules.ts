@@ -6,6 +6,7 @@ export type ModuleKey =
   | "rastreabilidade"
   | "planos"
   | "captura"
+  | "oficina"
 
 export interface ModuleConfig {
   key: ModuleKey
@@ -56,6 +57,14 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     icon: "Inbox",
     href: "/captura",
     color: "#E07A35",
+  },
+  {
+    key: "oficina",
+    label: "Oficina",
+    description: "Ordens de serviço, estoque de insumos e indicadores de reaproveitamento",
+    icon: "Wrench",
+    href: "/oficina",
+    color: "#7C5C3E",
   },
 ]
 

@@ -48,6 +48,12 @@ model Company {
   checklists Checklist[]
   executions ChecklistExecution[]
 
+  workshopAreas        WorkshopArea[]
+  workshopProducts     WorkshopProduct[]
+  workshopMaterials    WorkshopMaterial[]
+  workshopPauseReasons WorkshopPauseReason[]
+  workshopOrders       WorkshopServiceOrder[]
+
   @@map("companies")
 }
 
@@ -69,6 +75,12 @@ model User {
   auditLogs            AuditLog[]
   checklistsCreated    Checklist[]          @relation("ChecklistCreator")
   checklistExecutions  ChecklistExecution[] @relation("ChecklistExecutor")
+
+  workshopOrdersRequested WorkshopServiceOrder[]       @relation("WorkshopOrderRequester")
+  workshopOrdersAssigned  WorkshopServiceOrder[]       @relation("WorkshopOrderAssignee")
+  workshopOrderLogs       WorkshopOrderLog[]           @relation("WorkshopOrderLogAuthor")
+  workshopDeliveries      WorkshopOrderDelivery[]      @relation("WorkshopDeliverer")
+  workshopConsumptions    WorkshopMaterialConsumption[] @relation("WorkshopConsumptionCreator")
 
   @@index([companyId])
   @@map("users")
@@ -283,6 +295,204 @@ model ExecutionFieldValue {
   @@unique([executionId, fieldId])
   @@index([executionId])
   @@map("execution_field_values")
+}
+
+// ─── Oficina ─────────────────────────────────────────────────────
+
+enum WorkshopOrderStatus {
+  NOVO
+  EM_ANALISE
+  PENDENTE
+  EM_PRODUCAO
+  ENTREGA_PARCIAL
+  CONCLUIDO
+  CANCELADO
+}
+
+enum WorkshopMaterialSource {
+  COMPRADO
+  RECICLADO
+}
+
+// Departamentos/áreas solicitantes (configurável pela empresa)
+model WorkshopArea {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @map("company_id")
+  name      String    @db.VarChar(200)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy Int?      @map("deleted_by")
+
+  company Company               @relation(fields: [companyId], references: [id])
+  orders  WorkshopServiceOrder[]
+
+  @@index([companyId])
+  @@map("workshop_areas")
+}
+
+// Catálogo de produtos/serviços que a oficina executa
+model WorkshopProduct {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @map("company_id")
+  name      String    @db.VarChar(200)
+  category  String?   @db.VarChar(100)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy Int?      @map("deleted_by")
+
+  company Company               @relation(fields: [companyId], references: [id])
+  orders  WorkshopServiceOrder[]
+
+  @@index([companyId])
+  @@map("workshop_products")
+}
+
+// Estoque de insumos da oficina
+model WorkshopMaterial {
+  id          Int       @id @default(autoincrement())
+  companyId   Int       @map("company_id")
+  name        String    @db.VarChar(200)
+  unit        String    @db.VarChar(30)         // ex: UN, KG, M, CHAPA, M_LINEAR
+  quantity    Decimal   @default(0) @db.Decimal(10, 3)
+  minQuantity Decimal   @default(0) @db.Decimal(10, 3) @map("min_quantity")
+  unitCost    Decimal?  @db.Decimal(10, 2)      @map("unit_cost") // para cálculo de economia ESG
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt              @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  deletedBy   Int?      @map("deleted_by")
+
+  company      Company                      @relation(fields: [companyId], references: [id])
+  consumptions WorkshopMaterialConsumption[]
+
+  @@index([companyId])
+  @@map("workshop_materials")
+}
+
+// Motivos padronizados de pausa de pedido
+model WorkshopPauseReason {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @map("company_id")
+  name      String    @db.VarChar(200)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy Int?      @map("deleted_by")
+
+  company Company               @relation(fields: [companyId], references: [id])
+  orders  WorkshopServiceOrder[]
+
+  @@index([companyId])
+  @@map("workshop_pause_reasons")
+}
+
+// Ordem de serviço — entidade principal do módulo
+model WorkshopServiceOrder {
+  id                Int                 @id @default(autoincrement())
+  companyId         Int                 @map("company_id")
+  requestedBy       Int                 @map("requested_by")
+  assignedTo        Int?                @map("assigned_to")   // operador responsável
+  areaId            Int                 @map("area_id")
+  productId         Int                 @map("product_id")
+  quantity          Int
+  quantityDelivered Int                 @default(0)           @map("quantity_delivered")
+  desiredDate       DateTime?           @map("desired_date")
+  details           String?             @db.Text
+  status            WorkshopOrderStatus @default(NOVO)
+  pauseReasonId     Int?                @map("pause_reason_id")
+  startedAt         DateTime?           @map("started_at")
+  finishedAt        DateTime?           @map("finished_at")
+  createdAt         DateTime            @default(now())       @map("created_at")
+  updatedAt         DateTime            @updatedAt            @map("updated_at")
+  deletedAt         DateTime?           @map("deleted_at")
+  deletedBy         Int?                @map("deleted_by")
+
+  company      Company                      @relation(fields: [companyId],     references: [id])
+  requester    User                         @relation("WorkshopOrderRequester", fields: [requestedBy], references: [id])
+  assignee     User?                        @relation("WorkshopOrderAssignee",  fields: [assignedTo],  references: [id])
+  area         WorkshopArea                 @relation(fields: [areaId],         references: [id])
+  product      WorkshopProduct              @relation(fields: [productId],       references: [id])
+  pauseReason  WorkshopPauseReason?         @relation(fields: [pauseReasonId],   references: [id])
+  logs         WorkshopOrderLog[]
+  deliveries   WorkshopOrderDelivery[]
+  attachments  WorkshopOrderAttachment[]
+  consumptions WorkshopMaterialConsumption[]
+
+  @@index([companyId])
+  @@index([requestedBy])
+  @@index([status])
+  @@map("workshop_service_orders")
+}
+
+// Log de negociação e histórico de status por pedido
+model WorkshopOrderLog {
+  id         Int                  @id @default(autoincrement())
+  orderId    Int                  @map("order_id")
+  userId     Int                  @map("user_id")
+  message    String               @db.Text
+  statusFrom WorkshopOrderStatus? @map("status_from")
+  statusTo   WorkshopOrderStatus? @map("status_to")
+  createdAt  DateTime             @default(now()) @map("created_at")
+
+  order WorkshopServiceOrder @relation(fields: [orderId], references: [id])
+  user  User                 @relation("WorkshopOrderLogAuthor", fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@map("workshop_order_logs")
+}
+
+// Registros de entrega parcial de um pedido
+model WorkshopOrderDelivery {
+  id          Int      @id @default(autoincrement())
+  orderId     Int      @map("order_id")
+  quantity    Int
+  note        String?  @db.Text
+  deliveredBy Int      @map("delivered_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  order     WorkshopServiceOrder @relation(fields: [orderId],     references: [id])
+  deliverer User                 @relation("WorkshopDeliverer",   fields: [deliveredBy], references: [id])
+
+  @@index([orderId])
+  @@map("workshop_order_deliveries")
+}
+
+// Fotos e anexos de um pedido
+model WorkshopOrderAttachment {
+  id        Int      @id @default(autoincrement())
+  orderId   Int      @map("order_id")
+  url       String   @db.VarChar(500)
+  fileName  String?  @db.VarChar(200) @map("file_name")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order WorkshopServiceOrder @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("workshop_order_attachments")
+}
+
+// Baixa de material por pedido (rastreabilidade ESG)
+model WorkshopMaterialConsumption {
+  id         Int                    @id @default(autoincrement())
+  orderId    Int                    @map("order_id")
+  materialId Int                    @map("material_id")
+  quantity   Decimal                @db.Decimal(10, 3)
+  source     WorkshopMaterialSource @default(COMPRADO)
+  note       String?                @db.Text
+  createdBy  Int                    @map("created_by")
+  createdAt  DateTime               @default(now()) @map("created_at")
+  deletedAt  DateTime?              @map("deleted_at")
+  deletedBy  Int?                   @map("deleted_by")
+
+  order    WorkshopServiceOrder @relation(fields: [orderId],    references: [id])
+  material WorkshopMaterial     @relation(fields: [materialId], references: [id])
+  creator  User                 @relation("WorkshopConsumptionCreator", fields: [createdBy], references: [id])
+
+  @@index([orderId])
+  @@index([materialId])
+  @@map("workshop_material_consumptions")
 }
 
 // ─── Módulos habilitados por empresa ─────────────────────────────

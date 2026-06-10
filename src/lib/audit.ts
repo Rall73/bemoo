@@ -35,6 +35,27 @@ export type AuditAction =
   // Checklists
   | "checklist.executado"
   | "checklist.importado_template"
+  // Oficina — master data
+  | "oficina.area.criada"
+  | "oficina.area.editada"
+  | "oficina.area.removida"
+  | "oficina.produto.criado"
+  | "oficina.produto.editado"
+  | "oficina.produto.removido"
+  | "oficina.material.criado"
+  | "oficina.material.editado"
+  | "oficina.material.removido"
+  | "oficina.pausa_motivo.criado"
+  | "oficina.pausa_motivo.editado"
+  | "oficina.pausa_motivo.removido"
+  // Oficina — ordens de serviço
+  | "oficina.pedido.criado"
+  | "oficina.pedido.status_alterado"
+  | "oficina.pedido.entrega_parcial"
+  | "oficina.pedido.cancelado"
+  // Oficina — estoque
+  | "oficina.consumo.registrado"
+  | "oficina.consumo.removido"
 
 // ─── Helper principal ─────────────────────────────────────────────────
 
