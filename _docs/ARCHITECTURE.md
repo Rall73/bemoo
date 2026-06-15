@@ -1,7 +1,7 @@
 # bemoo — Arquitetura do Sistema
 
 > Documento vivo. Atualizar sempre que um módulo, rota ou padrão novo for adicionado.
-> Última revisão: 2026-06-10 (rev 4)
+> Última revisão: 2026-06-15 (rev 5)
 >
 > Complementa o [PIPELINE.md](./PIPELINE.md) (o quê está feito/planejado) com
 > o **como** o sistema funciona hoje.
@@ -152,6 +152,28 @@ src/
 | `report_generated_at` | DateTime? | Data da última geração |
 | `conclusion_note` | Text? | Observação final do executor |
 
+### `execution_item_notes`
+Foto, áudio e anotação por **item** de checklist (não por campo). Chave única `(execution_id, item_id)`.
+| Campo | Tipo | Notas |
+|---|---|---|
+| `execution_id` | Int FK | |
+| `item_id` | Int FK | |
+| `photo_url` | String? | URL Cloudinary |
+| `annotation` | Text? | Anotação manual |
+| `transcription` | Text? | Texto transcrito pelo Whisper |
+
+### `user_module_access`
+Controla acesso de cada usuário a módulos específicos dentro da empresa. A tela de módulos habilitados
+é a **intersecção** entre `company_modules` (módulos da empresa) e `user_module_access` (módulos do usuário).
+| Campo | Tipo | Notas |
+|---|---|---|
+| `user_id` | Int FK | |
+| `company_id` | Int FK | |
+| `module_key` | VarChar(50) | Mesma chave de `MODULES_CONFIG` |
+| `granted_at` | DateTime | |
+| `granted_by` | Int? FK | Id do admin que concedeu |
+Chave única: `(user_id, module_key)`.
+
 ### Módulo Oficina (`workshop_*`)
 
 | Modelo | Tabela | Descrição |
@@ -171,6 +193,7 @@ src/
 
 ### Outras tabelas
 - `company_modules` — módulos habilitados por empresa (chave: string)
+- `user_module_access` — módulos acessíveis por usuário (intersecta com company_modules)
 - `audit_logs` — registro imutável de todas as ações com payload before/after
 - `legal_versions` + `legal_acceptances` — versionamento de termos/privacidade
 - `password_resets` — tokens de reset (1h, uso único)
@@ -337,6 +360,8 @@ ISO 9001:2015: template em produção, id=4, 13 seções, 72 campos
 | `/api/usuarios/[id]` | DELETE | ADMIN | Desativar (soft delete) |
 | `/api/usuarios/direto` | POST | ADMIN | Criar usuário com senha temporária (reativa soft-deleted da mesma empresa) |
 | `/api/usuarios/[id]/resetar-senha` | POST | ADMIN | Resetar senha de membro — gera senha temporária, seta `mustChangePassword=true` |
+| `/api/usuarios/[id]/modulos` | GET | ADMIN | Listar módulos acessíveis do usuário |
+| `/api/usuarios/[id]/modulos` | PUT | ADMIN | Substituir conjunto de módulos do usuário (valida contra company_modules) |
 
 ### Configurações
 | Rota | Método | Descrição |
@@ -359,8 +384,10 @@ ISO 9001:2015: template em produção, id=4, 13 seções, 72 campos
 | Rota | Método | Descrição |
 |---|---|---|
 | `/api/execucoes` | GET, POST | Histórico / iniciar execução |
-| `/api/execucoes/[id]` | GET | Dados completos da execução |
-| `/api/execucoes/[id]/finalizar` | POST | Gravar respostas + COMPLETED |
+| `/api/execucoes/[id]` | GET | Dados completos da execução (inclui `itemNotes`) |
+| `/api/execucoes/[id]` | DELETE | Soft-delete de execução IN_PROGRESS |
+| `/api/execucoes/[id]/salvar` | POST | Salvar parcialmente (sem validação obrigatória) — mantém IN_PROGRESS |
+| `/api/execucoes/[id]/finalizar` | POST | Gravar respostas + notas por item + COMPLETED |
 | `/api/execucoes/[id]/relatorio` | POST | Gerar .docx (básico ou IA) |
 | `/api/execucoes/[id]/relatorio/analise` | POST | Gerar análise via GPT |
 
@@ -427,12 +454,14 @@ Verificado no layout do grupo de rotas correspondente.
 |---|---|---|
 | `checklists` | `/checklists` | ✅ Em produção |
 | `oficina` | `/oficina` (pedidos, estoque, cadastros, dashboard ESG) | ✅ Em produção |
+| `efetivo` | `/efetivo` | 🔨 Fase 0 em desenvolvimento |
 | `intercorrencias` | `/intercorrencias` | ⏳ Fase 6.2 |
 | `rastreabilidade` | `/rastreabilidade` | ⏳ Fase 6.3 |
 | `planos` | `/planos` | ⏳ Fase 6.4 |
 | `captura` | `/captura` | ⏳ Fase 6.5 |
 
-Para habilitar módulo: painel `/plataforma/empresas/[id]/modulos` → toggle.
+Para habilitar módulo para empresa: painel `/plataforma/empresas/[id]/modulos` → toggle.
+Para conceder módulo a usuário: Configuracoes > Usuarios → ícone de grade → checkboxes.
 
 ---
 
