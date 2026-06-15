@@ -1,6 +1,6 @@
 # bemoo — Pipeline de Desenvolvimento
 
-> Última revisão: 2026-06-02
+> Última revisão: 2026-06-10
 > Detalhe completo de cada fase: histórico preservado abaixo em "Fases concluídas".
 
 ---

@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { UserPlus, RotateCcw, Trash2, X, Mail, Shield, ChevronDown, KeyRound, Copy, Check, RefreshCw } from "lucide-react"
+import { UserPlus, RotateCcw, Trash2, X, Mail, Shield, ChevronDown, KeyRound, Copy, Check, RefreshCw, LayoutGrid, Loader2 } from "lucide-react"
+import { MODULES_CONFIG } from "@/lib/modules"
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 
@@ -27,13 +28,15 @@ interface Invite {
 }
 
 interface Props {
-  users:         Usuario[]
-  invites:       Invite[]
-  currentUserId: number
-  isAdmin:       boolean
-  plan:          string
-  userLimit:     number | null   // null = ilimitado
-  activeCount:   number
+  users:            Usuario[]
+  invites:          Invite[]
+  currentUserId:    number
+  isAdmin:          boolean
+  plan:             string
+  userLimit:        number | null
+  activeCount:      number
+  companyModules:   string[]
+  userModuleAccess: Record<number, string[]>
 }
 
 // ─── Configurações de papel ────────────────────────────────────────
@@ -372,13 +375,117 @@ function ConfirmDialog({
   )
 }
 
+// ─── Modal de modulos por usuario ─────────────────────────────────
+
+function ModulosModal({
+  user,
+  companyModules,
+  initialKeys,
+  onClose,
+  onSuccess,
+}: {
+  user:           Usuario
+  companyModules: string[]
+  initialKeys:    string[]
+  onClose:        () => void
+  onSuccess:      (userId: number, keys: string[]) => void
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set(initialKeys))
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState("")
+
+  function toggle(key: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
+  async function handleSave() {
+    setLoading(true)
+    setError("")
+    try {
+      const res  = await fetch(`/api/usuarios/${user.id}/modulos`, {
+        method:  "PUT",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ moduleKeys: [...selected] }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        onSuccess(user.id, json.data?.moduleKeys ?? [...selected])
+      } else {
+        setError(json.message ?? "Erro ao salvar.")
+      }
+    } catch {
+      setError("Erro de conexao.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const availableModules = MODULES_CONFIG.filter((m) => companyModules.includes(m.key))
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-round border border-gray-200 shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-base font-semibold text-gray-900">Modulos — {user.name}</h2>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-soft hover:bg-gray-100">
+            <X size={18} strokeWidth={2} />
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mb-4">Marque os modulos que este usuario pode acessar.</p>
+
+        {availableModules.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">
+            Nenhum modulo habilitado para esta empresa.
+          </p>
+        ) : (
+          <div className="space-y-2 mb-4">
+            {availableModules.map((mod) => (
+              <label key={mod.key} className="flex items-center gap-3 p-3 rounded-soft border border-gray-100 hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selected.has(mod.key)}
+                  onChange={() => toggle(mod.key)}
+                  className="w-4 h-4 accent-primary"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{mod.label}</p>
+                  <p className="text-xs text-gray-400 truncate">{mod.description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {error && (
+          <p className="text-xs text-error bg-red-50 border border-red-100 rounded-soft px-3 py-2 mb-3">
+            {error}
+          </p>
+        )}
+
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button type="button" variant="primary" size="sm" loading={loading} onClick={handleSave}>
+            Salvar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Componente principal ──────────────────────────────────────────
 
 const PLAN_LABEL: Record<string, string> = {
   FREE: "Free", STARTER: "Starter", PROFESSIONAL: "Professional", ENTERPRISE: "Enterprise",
 }
 
-export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, userLimit, activeCount }: Props) {
+export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, userLimit, activeCount, companyModules, userModuleAccess: initialAccessMap }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
 
@@ -390,6 +497,10 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
   const [actionLoading,     setActionLoading]     = useState<string | null>(null)
   const [roleLoading,       setRoleLoading]       = useState<number | null>(null)
   const [feedback,          setFeedback]          = useState("")
+
+  // Modulos
+  const [modulosUser,   setModulosUser]   = useState<Usuario | null>(null)
+  const [accessMap,     setAccessMap]     = useState<Record<number, string[]>>(initialAccessMap)
 
   function refresh() {
     startTransition(() => router.refresh())
@@ -518,6 +629,21 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
         />
       )}
 
+      {/* Modal de modulos */}
+      {modulosUser && (
+        <ModulosModal
+          user={modulosUser}
+          companyModules={companyModules}
+          initialKeys={accessMap[modulosUser.id] ?? []}
+          onClose={() => setModulosUser(null)}
+          onSuccess={(userId, keys) => {
+            setAccessMap((prev) => ({ ...prev, [userId]: keys }))
+            setModulosUser(null)
+            showFeedback("Modulos atualizados.")
+          }}
+        />
+      )}
+
       {/* Conteúdo */}
       <div className="p-6 max-w-4xl mx-auto">
 
@@ -639,13 +765,27 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
                     desde {formatDate(user.createdAt)}
                   </p>
 
+                  {/* Modulos habilitados (badge resumido) */}
+                  {isAdmin && !isMe && companyModules.length > 0 && (
+                    <span className="text-[10px] text-gray-400 flex-shrink-0 hidden lg:block">
+                      {(accessMap[user.id] ?? []).length}/{companyModules.length} mod.
+                    </span>
+                  )}
+
                   {/* Ações */}
                   {isAdmin && !isMe && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button
+                        onClick={() => setModulosUser(user)}
+                        title="Gerenciar modulos"
+                        className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-soft transition-colors"
+                      >
+                        <LayoutGrid size={14} strokeWidth={2} />
+                      </button>
+                      <button
                         onClick={() => handleResetarSenha(user)}
                         disabled={!!actionLoading}
-                        title="Resetar senha (gera nova senha temporária)"
+                        title="Resetar senha (gera nova senha temporaria)"
                         className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-soft transition-colors disabled:opacity-40"
                       >
                         <RefreshCw size={14} strokeWidth={2} />
@@ -653,7 +793,7 @@ export function UsuariosClient({ users, invites, currentUserId, isAdmin, plan, u
                       <button
                         onClick={() => setConfirmDeactivate(user)}
                         disabled={actionLoading === `deactivate-${user.id}`}
-                        title="Desativar usuário"
+                        title="Desativar usuario"
                         className="p-1.5 text-gray-400 hover:text-error hover:bg-red-50 rounded-soft transition-colors disabled:opacity-40"
                       >
                         <Trash2 size={15} strokeWidth={2} />

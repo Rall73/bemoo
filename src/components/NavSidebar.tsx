@@ -6,7 +6,7 @@ import { signOut } from "next-auth/react"
 import { BemooLogo } from "@/components/Logo"
 import { MODULES_CONFIG } from "@/lib/modules"
 import {
-  CheckSquare, AlertTriangle, Tag, Target, Inbox, Wrench,
+  CheckSquare, AlertTriangle, Tag, Target, Inbox, Wrench, Users2,
   LayoutDashboard, LogOut, ChevronRight, Users,
   Building2, BarChart2, ScrollText, UserCircle, X, Layers, History,
   Package, Settings2,
@@ -20,6 +20,7 @@ const MODULE_ICONS = {
   planos:          Target,
   captura:         Inbox,
   oficina:         Wrench,
+  efetivo:         Users2,
 } as const
 
 interface NavSidebarProps {

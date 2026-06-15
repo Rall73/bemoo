@@ -13,20 +13,29 @@ export default async function AppLayout({
   const session = await auth()
   if (!session?.user) redirect("/login")
 
-  const userId = parseInt(session.user.id)
+  const userId    = parseInt(session.user.id)
+  const companyId = session.user.companyId as number
 
-  // Verificar documentos legais pendentes de aceite
   const pendingVersions = await getPendingVersions(userId)
   if (pendingVersions.length > 0) {
     return <LegalGate versions={pendingVersions} />
   }
 
-  // Busca módulos habilitados para a empresa
-  const companyModules = await prisma.companyModule.findMany({
-    where: { companyId: session.user.companyId },
-    select: { module: true },
-  })
-  const enabledModules = companyModules.map((m) => m.module)
+  // Módulos habilitados para a empresa × acesso do usuário
+  const [companyModules, userAccess] = await Promise.all([
+    prisma.companyModule.findMany({
+      where:  { companyId },
+      select: { module: true },
+    }),
+    prisma.userModuleAccess.findMany({
+      where:  { userId, companyId },
+      select: { moduleKey: true },
+    }),
+  ])
+
+  const companyKeys  = new Set(companyModules.map((m) => m.module))
+  const userKeys     = new Set(userAccess.map((a) => a.moduleKey))
+  const enabledModules = [...companyKeys].filter((k) => userKeys.has(k))
 
   return (
     <AppShell

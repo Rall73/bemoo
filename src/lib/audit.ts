@@ -26,6 +26,8 @@ export type AuditAction =
   // Módulos (plataforma admin)
   | "modulo.habilitado"
   | "modulo.desabilitado"
+  | "modulo.acesso_concedido"
+  | "modulo.acesso_revogado"
   // Legal
   | "legal.aceito"
   // Senha

@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { MODULES_CONFIG } from "@/lib/modules"
-import { CheckSquare, AlertTriangle, Tag, Target, Inbox, Wrench, ArrowRight } from "lucide-react"
+import { CheckSquare, AlertTriangle, Tag, Target, Inbox, Wrench, Users2, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
 const MODULE_ICONS: Record<string, React.ElementType> = {
@@ -11,34 +11,46 @@ const MODULE_ICONS: Record<string, React.ElementType> = {
   planos:          Target,
   captura:         Inbox,
   oficina:         Wrench,
+  efetivo:         Users2,
 }
 
 export default async function DashboardPage() {
   const session = await auth()
   if (!session?.user) return null
 
-  const companyModules = await prisma.companyModule.findMany({
-    where: { companyId: session.user.companyId as number },
-    select: { module: true },
-  })
-  const enabledKeys = companyModules.map((m) => m.module)
-  const enabledModules = MODULES_CONFIG.filter((m) => enabledKeys.includes(m.key))
+  const userId    = parseInt(session.user.id)
+  const companyId = session.user.companyId as number
+
+  const [companyModules, userAccess] = await Promise.all([
+    prisma.companyModule.findMany({
+      where:  { companyId },
+      select: { module: true },
+    }),
+    prisma.userModuleAccess.findMany({
+      where:  { userId, companyId },
+      select: { moduleKey: true },
+    }),
+  ])
+
+  const companyKeys    = new Set(companyModules.map((m) => m.module))
+  const userKeys       = new Set(userAccess.map((a) => a.moduleKey))
+  const enabledModules = MODULES_CONFIG.filter(
+    (m) => companyKeys.has(m.key) && userKeys.has(m.key)
+  )
 
   const firstName = (session.user.name ?? "").split(" ")[0]
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      {/* Saudação */}
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-gray-900" style={{ letterSpacing: "-0.02em" }}>
-          Olá, {firstName}
+          Ola, {firstName}
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          Bem-vindo ao bemoo. Selecione um módulo para começar.
+          Bem-vindo ao bemoo. Selecione um modulo para comecar.
         </p>
       </div>
 
-      {/* Grid de módulos */}
       {enabledModules.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {enabledModules.map((mod) => {
@@ -67,13 +79,13 @@ export default async function DashboardPage() {
         </div>
       ) : (
         <div className="text-center py-16 text-gray-400">
-          <p className="text-sm">Nenhum módulo habilitado para esta empresa.</p>
+          <p className="text-sm">Nenhum modulo habilitado para este usuario.</p>
           {(session.user.platformAdmin as boolean) && (
             <Link
               href="/plataforma/empresas"
               className="inline-flex items-center gap-1.5 mt-3 text-sm text-primary hover:underline"
             >
-              Gerenciar módulos <ArrowRight size={14} />
+              Gerenciar modulos <ArrowRight size={14} />
             </Link>
           )}
         </div>

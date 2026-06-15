@@ -1,7 +1,7 @@
 # bemoo — Arquitetura do Sistema
 
 > Documento vivo. Atualizar sempre que um módulo, rota ou padrão novo for adicionado.
-> Última revisão: 2026-06-02 (rev 3)
+> Última revisão: 2026-06-10 (rev 4)
 >
 > Complementa o [PIPELINE.md](./PIPELINE.md) (o quê está feito/planejado) com
 > o **como** o sistema funciona hoje.
@@ -38,6 +38,7 @@ src/
         usuarios/       → todos os usuários da plataforma
         metricas/       → KPIs globais
         logs/           → audit logs paginados
+      oficina/          → módulo de ordens de serviço, estoque e indicadores ESG
       dashboard/        → página inicial do usuário
     (auth)/             → login, cadastro, aceitar-convite, redefinir-senha
     (legal)/            → /privacidade, /termos
@@ -59,7 +60,8 @@ src/
                           getUserLimit(plan, maxUsersOverride)
     prisma.ts           → singleton do cliente Prisma
     reportDocx.ts       → gerarRelatorioDocx(data, analise?) → Buffer
-    validators.ts       → schemas Zod reutilizáveis (zNome, zEmail, zConviteSchema, ...)
+    senha.ts            → gerarSenhaTemporaria() — senha aleatória usada em criação direta e reset admin
+    validators.ts       → schemas Zod reutilizáveis (zNome, zEmail, zConviteSchema, zCriarUsuarioDiretoSchema, ...)
 
   emails/
     boas-vindas.ts      → e-mail de boas-vindas ao cadastro
@@ -96,6 +98,7 @@ src/
 | `name`, `email`, `password` | String | password = bcrypt hash |
 | `role` | Enum | ADMIN \| GESTOR \| EXECUTOR \| AUDITOR |
 | `platform_admin` | Boolean | Acesso ao painel `/plataforma` |
+| `must_change_password` | Boolean | `true` quando senha temporária foi gerada pelo admin — força troca no próximo login |
 | `deleted_at`, `deleted_by` | DateTime?, Int? | Soft delete |
 
 **Hierarquia de roles:** ADMIN > GESTOR > EXECUTOR > AUDITOR
@@ -148,6 +151,23 @@ src/
 | `report_ia_url` | String? | URL do relatório com análise IA |
 | `report_generated_at` | DateTime? | Data da última geração |
 | `conclusion_note` | Text? | Observação final do executor |
+
+### Módulo Oficina (`workshop_*`)
+
+| Modelo | Tabela | Descrição |
+|---|---|---|
+| `WorkshopArea` | `workshop_areas` | Setor/área de produção (ex: Corte, Solda) |
+| `WorkshopProduct` | `workshop_products` | Catálogo de produtos/serviços executados |
+| `WorkshopMaterial` | `workshop_materials` | Estoque de insumos com quantidade e custo unitário |
+| `WorkshopPauseReason` | `workshop_pause_reasons` | Motivos padronizados de pausa de pedido |
+| `WorkshopServiceOrder` | `workshop_service_orders` | Ordem de serviço — entidade principal (status: NOVO→EM_PRODUCAO→PAUSADO→CONCLUIDO→CANCELADO) |
+| `WorkshopOrderLog` | `workshop_order_logs` | Histórico de mudanças de status e negociações |
+| `WorkshopOrderDelivery` | `workshop_order_deliveries` | Entregas parciais de um pedido |
+| `WorkshopOrderAttachment` | `workshop_order_attachments` | Fotos e anexos do pedido |
+| `WorkshopMaterialConsumption` | `workshop_material_consumptions` | Baixa de material por pedido (rastreabilidade ESG) |
+
+`WorkshopMaterial` tem `unitCost` para cálculo de economia ESG.
+`WorkshopMaterialConsumption.source` = `COMPRADO | REAPROVEITADO` — base para indicadores de reuso.
 
 ### Outras tabelas
 - `company_modules` — módulos habilitados por empresa (chave: string)
@@ -315,6 +335,8 @@ ISO 9001:2015: template em produção, id=4, 13 seções, 72 campos
 | `/api/usuarios/convite/[id]` | DELETE | ADMIN | Cancelar convite |
 | `/api/usuarios/[id]` | PATCH | ADMIN | Alterar role |
 | `/api/usuarios/[id]` | DELETE | ADMIN | Desativar (soft delete) |
+| `/api/usuarios/direto` | POST | ADMIN | Criar usuário com senha temporária (reativa soft-deleted da mesma empresa) |
+| `/api/usuarios/[id]/resetar-senha` | POST | ADMIN | Resetar senha de membro — gera senha temporária, seta `mustChangePassword=true` |
 
 ### Configurações
 | Rota | Método | Descrição |
@@ -350,6 +372,26 @@ ISO 9001:2015: template em produção, id=4, 13 seções, 72 campos
 | `/api/plataforma/templates` | GET, POST | platformAdmin | Listar / criar template |
 | `/api/plataforma/templates/[id]` | PATCH, DELETE | platformAdmin | Editar / arquivar |
 
+### Oficina
+
+| Rota | Método | Descrição |
+|---|---|---|
+| `/api/oficina/areas` | GET, POST | Listar / criar áreas |
+| `/api/oficina/areas/[id]` | PATCH, DELETE | Editar / arquivar área |
+| `/api/oficina/produtos` | GET, POST | Listar / criar produtos |
+| `/api/oficina/produtos/[id]` | PATCH, DELETE | Editar / arquivar produto |
+| `/api/oficina/materiais` | GET, POST | Listar / criar materiais |
+| `/api/oficina/materiais/[id]` | PATCH, DELETE | Editar / ajustar estoque |
+| `/api/oficina/motivos-pausa` | GET, POST | Listar / criar motivos de pausa |
+| `/api/oficina/motivos-pausa/[id]` | PATCH, DELETE | Editar / arquivar motivo |
+| `/api/oficina/pedidos` | GET, POST | Listar / abrir ordem de serviço |
+| `/api/oficina/pedidos/[id]` | GET, PATCH | Detalhe / atualizar status |
+| `/api/oficina/pedidos/[id]/logs` | GET, POST | Histórico / adicionar log |
+| `/api/oficina/pedidos/[id]/entregas` | POST | Registrar entrega parcial |
+| `/api/oficina/pedidos/[id]/consumos` | GET, POST | Listar / registrar consumo de material |
+| `/api/oficina/pedidos/[id]/consumos/[consumoId]` | DELETE | Estornar consumo |
+| `/api/oficina/dashboard` | GET | KPIs e indicadores ESG da oficina |
+
 ### Upload e IA
 | Rota | Método | Descrição |
 |---|---|---|
@@ -384,7 +426,7 @@ Verificado no layout do grupo de rotas correspondente.
 | Key | Rota principal | Status |
 |---|---|---|
 | `checklists` | `/checklists` | ✅ Em produção |
-| `oficina` | `/oficina` | ✅ Em produção |
+| `oficina` | `/oficina` (pedidos, estoque, cadastros, dashboard ESG) | ✅ Em produção |
 | `intercorrencias` | `/intercorrencias` | ⏳ Fase 6.2 |
 | `rastreabilidade` | `/rastreabilidade` | ⏳ Fase 6.3 |
 | `planos` | `/planos` | ⏳ Fase 6.4 |

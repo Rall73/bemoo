@@ -7,6 +7,7 @@ export type ModuleKey =
   | "planos"
   | "captura"
   | "oficina"
+  | "efetivo"
 
 export interface ModuleConfig {
   key: ModuleKey
@@ -65,6 +66,14 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     icon: "Wrench",
     href: "/oficina",
     color: "#7C5C3E",
+  },
+  {
+    key: "efetivo",
+    label: "Controle de Efetivo",
+    description: "Gestao de colaboradores, escalas e presenca por turno",
+    icon: "Users2",
+    href: "/efetivo",
+    color: "#1F4E4A",
   },
 ]
 

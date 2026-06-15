@@ -42,9 +42,10 @@ model Company {
   suspendedAt  DateTime? @map("suspended_at")
   featureAudio Boolean   @default(false) @map("feature_audio")
 
-  users      User[]
-  modules    CompanyModule[]
-  auditLogs  AuditLog[]
+  users            User[]
+  modules          CompanyModule[]
+  userModuleAccess UserModuleAccess[]
+  auditLogs        AuditLog[]
   checklists Checklist[]
   executions ChecklistExecution[]
 
@@ -81,6 +82,9 @@ model User {
   workshopOrderLogs       WorkshopOrderLog[]           @relation("WorkshopOrderLogAuthor")
   workshopDeliveries      WorkshopOrderDelivery[]      @relation("WorkshopDeliverer")
   workshopConsumptions    WorkshopMaterialConsumption[] @relation("WorkshopConsumptionCreator")
+
+  moduleAccess        UserModuleAccess[] @relation("UMAUser")
+  moduleAccessGranted UserModuleAccess[] @relation("UMAGrantor")
 
   @@index([companyId])
   @@map("users")
@@ -514,6 +518,26 @@ model WorkshopMaterialConsumption {
   @@index([orderId])
   @@index([materialId])
   @@map("workshop_material_consumptions")
+}
+
+// ─── Acesso por módulo por usuário ───────────────────────────────
+
+model UserModuleAccess {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  companyId Int      @map("company_id")
+  moduleKey String   @db.VarChar(50) @map("module_key")
+  grantedAt DateTime @default(now()) @map("granted_at")
+  grantedBy Int?     @map("granted_by")
+
+  user    User    @relation("UMAUser",    fields: [userId],    references: [id])
+  company Company @relation(            fields: [companyId], references: [id])
+  grantor User?   @relation("UMAGrantor", fields: [grantedBy], references: [id])
+
+  @@unique([userId, moduleKey])
+  @@index([userId])
+  @@index([companyId])
+  @@map("user_module_access")
 }
 
 // ─── Módulos habilitados por empresa ─────────────────────────────
