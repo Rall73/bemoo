@@ -72,6 +72,11 @@ export type AuditAction =
   | "efetivo.cargo.criado"
   | "efetivo.cargo.editado"
   | "efetivo.cargo.removido"
+  // Efetivo — colaboradores
+  | "efetivo.colaborador.editado"
+  | "efetivo.movimentacao.criada"
+  | "efetivo.ocorrencia.criada"
+  | "efetivo.ocorrencia.removida"
 
 // ─── Helper principal ─────────────────────────────────────────────────
 
