@@ -1,8 +1,8 @@
-import { auth }          from "@/auth"
-import { prisma }        from "@/lib/prisma"
-import { redirect }      from "next/navigation"
-import { hojeNoBrasil }  from "@/lib/date"
-import { EscalaClient }  from "@/app/(app)/efetivo/_components/EscalaClient"
+import { auth }         from "@/auth"
+import { prisma }       from "@/lib/prisma"
+import { redirect }     from "next/navigation"
+import { hojeNoBrasil } from "@/lib/date"
+import { EscalaClient } from "@/app/(app)/efetivo/_components/EscalaClient"
 
 export const metadata = { title: "Escala de Trabalho" }
 
@@ -20,16 +20,24 @@ export default async function EscalaPage({
 
   const companyId = session.user.companyId
 
-  const turnos = await prisma.efetivoTurno.findMany({
-    where:   { companyId, deletedAt: null, ativo: true },
-    select:  { id: true, codigo: true },
-    orderBy: { codigo: "asc" },
-  })
+  const [turnos, areas] = await Promise.all([
+    prisma.efetivoTurno.findMany({
+      where:   { companyId, deletedAt: null, ativo: true },
+      select:  { id: true, codigo: true },
+      orderBy: { codigo: "asc" },
+    }),
+    prisma.efetivoArea.findMany({
+      where:   { companyId, deletedAt: null, ativo: true },
+      select:  { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    }),
+  ])
 
   return (
     <EscalaClient
       mesInicial={mesAtual}
       turnos={turnos}
+      areas={areas}
       role={session.user.role}
     />
   )

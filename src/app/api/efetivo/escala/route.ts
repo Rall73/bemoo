@@ -1,5 +1,5 @@
 import { withAuth, ok } from "@/lib/api"
-import { prisma }      from "@/lib/prisma"
+import { prisma }       from "@/lib/prisma"
 import { hojeNoBrasil } from "@/lib/date"
 import { parseMes, diasDoMes, calculaDia, diaSemanaAbrev } from "@/lib/efetivo-escala"
 
@@ -15,7 +15,9 @@ export const GET = withAuth(async (req, session) => {
   }
 
   const turnoIdParam = searchParams.get("turnoId")
+  const areaIdParam  = searchParams.get("areaId")
   const turnoId      = turnoIdParam ? parseInt(turnoIdParam) : undefined
+  const areaId       = areaIdParam  ? parseInt(areaIdParam)  : undefined
   const companyId    = session.user.companyId
 
   const { ano, mesNum } = parseMes(mes)
@@ -30,18 +32,20 @@ export const GET = withAuth(async (req, session) => {
         status:    "ATIVO",
         deletedAt: null,
         ...(turnoId ? { turnoId } : {}),
+        ...(areaId  ? { areaId }  : {}),
       },
       select: {
-        id:        true,
-        matricula: true,
-        nome:      true,
+        id:         true,
+        matricula:  true,
+        nome:       true,
         dataAncora: true,
         padraoEscala: {
           select: { modo: true, diasSemana: true, diasTrabalho: true, diasFolga: true },
         },
         turno: { select: { id: true, codigo: true } },
+        area:  { select: { id: true, nome: true } },
       },
-      orderBy: [{ turno: { codigo: "asc" } }, { nome: "asc" }],
+      orderBy: [{ area: { nome: "asc" } }, { turno: { codigo: "asc" } }, { nome: "asc" }],
     }),
     prisma.efetivoEvento.findMany({
       where: {
@@ -51,12 +55,12 @@ export const GET = withAuth(async (req, session) => {
         dataFim:    { gte: inicioMes },
       },
       select: {
-        id:           true,
+        id:            true,
         colaboradorId: true,
-        tipo:         true,
-        dataInicio:   true,
-        dataFim:      true,
-        observacao:   true,
+        tipo:          true,
+        dataInicio:    true,
+        dataFim:       true,
+        observacao:    true,
       },
     }),
     prisma.efetivoSnapshot.findFirst({
@@ -74,11 +78,12 @@ export const GET = withAuth(async (req, session) => {
   }
 
   const resultColabs = colaboradores.map((c) => ({
-    id:       c.id,
+    id:        c.id,
     matricula: c.matricula,
-    nome:     c.nome,
-    turno:    c.turno,
-    escala:   Object.fromEntries(
+    nome:      c.nome,
+    turno:     c.turno,
+    area:      c.area,
+    escala:    Object.fromEntries(
       diasDates.map((d) => [
         d.getUTCDate(),
         calculaDia(c.padraoEscala, c.dataAncora, d, evMap.get(c.id) ?? []),
@@ -88,16 +93,16 @@ export const GET = withAuth(async (req, session) => {
 
   return ok({
     mes,
-    dias:       diasDates.map((d) => d.getUTCDate()),
-    diasSemana: diasDates.map(diaSemanaAbrev),
+    dias:          diasDates.map((d) => d.getUTCDate()),
+    diasSemana:    diasDates.map(diaSemanaAbrev),
     colaboradores: resultColabs,
     eventos: eventos.map((ev) => ({
-      id:           ev.id,
+      id:            ev.id,
       colaboradorId: ev.colaboradorId,
-      tipo:         ev.tipo,
-      dataInicio:   ev.dataInicio.toISOString().slice(0, 10),
-      dataFim:      ev.dataFim.toISOString().slice(0, 10),
-      observacao:   ev.observacao,
+      tipo:          ev.tipo,
+      dataInicio:    ev.dataInicio.toISOString().slice(0, 10),
+      dataFim:       ev.dataFim.toISOString().slice(0, 10),
+      observacao:    ev.observacao,
     })),
     snapshot: snapshot
       ? { mes: snapshot.mes, publicadoEm: snapshot.publicadoEm.toISOString() }
