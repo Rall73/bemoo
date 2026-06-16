@@ -38,6 +38,11 @@ enum EfetivoTipoEvento {
   AFASTAMENTO_INSS
   FALTA_JUSTIFICADA
   FALTA_INJUSTIFICADA
+  ATRASO
+  SAIDA_ANTECIPADA
+  HORA_EXTRA
+  TROCA_TURNO_SAIDA
+  TROCA_TURNO_ENTRADA
 }
 
 enum Plan {
@@ -821,6 +826,7 @@ model EfetivoEvento {
   dataInicio    DateTime          @db.Date @map("data_inicio")
   dataFim       DateTime          @db.Date @map("data_fim")
   observacao    String?           @db.Text
+  horaAjuste    String?           @db.VarChar(5) @map("hora_ajuste")
   criadoPor     Int               @map("criado_por")
   createdAt     DateTime          @default(now()) @map("created_at")
   deletedAt     DateTime?         @map("deleted_at")

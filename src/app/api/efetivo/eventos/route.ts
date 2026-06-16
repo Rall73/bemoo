@@ -14,10 +14,16 @@ const zEvento = z.object({
     "AFASTAMENTO_INSS",
     "FALTA_JUSTIFICADA",
     "FALTA_INJUSTIFICADA",
+    "ATRASO",
+    "SAIDA_ANTECIPADA",
+    "HORA_EXTRA",
+    "TROCA_TURNO_SAIDA",
+    "TROCA_TURNO_ENTRADA",
   ]),
-  dataInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  dataFim:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  observacao: z.string().max(500).nullable().optional(),
+  dataInicio:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dataFim:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  horaAjuste:  z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  observacao:  z.string().max(500).nullable().optional(),
 })
 
 export const POST = withAuth(async (req, session) => {
@@ -45,6 +51,7 @@ export const POST = withAuth(async (req, session) => {
       tipo:          data.tipo as any,
       dataInicio:    parseDataLocal(data.dataInicio),
       dataFim:       parseDataLocal(data.dataFim),
+      horaAjuste:    data.horaAjuste ?? null,
       observacao:    data.observacao ?? null,
       criadoPor:     parseInt(session.user.id),
     },

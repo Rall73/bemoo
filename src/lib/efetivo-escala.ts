@@ -9,6 +9,12 @@ export type StatusEscala =
   | "ATESTADO"
   | "AFASTAMENTO_INSS"
   | "FALTA_JUSTIFICADA"
+  | "FALTA_INJUSTIFICADA"
+  | "ATRASO"
+  | "SAIDA_ANTECIPADA"
+  | "HORA_EXTRA"
+  | "TROCA_TURNO_SAIDA"
+  | "TROCA_TURNO_ENTRADA"
 
 export interface PadraoEscalaCalc {
   modo:         "FIXO_SEMANAL" | "ROTATIVO"
