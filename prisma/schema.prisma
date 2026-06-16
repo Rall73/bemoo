@@ -37,6 +37,7 @@ enum EfetivoTipoEvento {
   ATESTADO
   AFASTAMENTO_INSS
   FALTA_JUSTIFICADA
+  FALTA_INJUSTIFICADA
 }
 
 enum Plan {

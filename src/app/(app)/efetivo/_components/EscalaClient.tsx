@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { ChevronLeft, ChevronRight, CalendarDays, Plus, X, Loader2, CheckCircle2, Search } from "lucide-react"
 import { formatarData } from "@/lib/date"
+import { STATUS_CFG, TIPOS_EVENTO_TODOS } from "@/lib/efetivo-status"
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 
@@ -40,27 +41,8 @@ interface ModalState {
   date:            string
 }
 
-// ─── Constantes ────────────────────────────────────────────────────────────
-
-const STATUS_CFG: Record<string, { bg: string; text: string; border: string; label: string; full: string }> = {
-  TRABALHA:          { bg: "bg-green-100",  text: "text-green-800",  border: "border-green-200",  label: "T",  full: "Trabalha" },
-  FOLGA:             { bg: "bg-gray-100",   text: "text-gray-400",   border: "border-gray-200",   label: "F",  full: "Folga" },
-  FERIAS:            { bg: "bg-sky-100",    text: "text-sky-700",    border: "border-sky-200",    label: "FE", full: "Férias" },
-  FOLGA_FERIADO:     { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200", label: "FF", full: "Feriado" },
-  FOLGA_DOMINICAL:   { bg: "bg-amber-50",   text: "text-amber-600",  border: "border-amber-200",  label: "FD", full: "F. Dom." },
-  ATESTADO:          { bg: "bg-yellow-100", text: "text-yellow-800", border: "border-yellow-200", label: "AT", full: "Atestado" },
-  AFASTAMENTO_INSS:  { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-200", label: "AI", full: "INSS" },
-  FALTA_JUSTIFICADA: { bg: "bg-red-100",    text: "text-red-700",    border: "border-red-200",    label: "FJ", full: "Falta Just." },
-}
-
-const TIPOS_EVENTO = [
-  { value: "FERIAS",            label: "Férias" },
-  { value: "FOLGA_FERIADO",     label: "Folga Feriado" },
-  { value: "FOLGA_DOMINICAL",   label: "Folga Dominical" },
-  { value: "ATESTADO",          label: "Atestado" },
-  { value: "AFASTAMENTO_INSS",  label: "Afastamento INSS" },
-  { value: "FALTA_JUSTIFICADA", label: "Falta Justificada" },
-]
+// STATUS_CFG e TIPOS_EVENTO importados de @/lib/efetivo-status
+const TIPOS_EVENTO = TIPOS_EVENTO_TODOS
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
