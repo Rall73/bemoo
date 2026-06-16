@@ -1,13 +1,13 @@
 # bemoo — Pipeline de Desenvolvimento
 
-> Ultima revisao: 2026-06-15
+> Ultima revisao: 2026-06-16
 > Detalhe completo de cada fase: historico preservado abaixo em "Fases concluidas".
 
 ---
 
 ## Estado atual
 
-**Em producao:** checklists completo (6.1) + Oficina (6.6) + controle de acesso por usuario por modulo
+**Em producao:** checklists completo (6.1) + Oficina (6.6) + Efetivo Fases 0-2 + controle de acesso por usuario por modulo
 
 - CRUD de modelos (3 niveis: checklist → secao → campo)
 - Execucao com foto/audio/anotacao por item (nao por campo), N/A, refs normativas
@@ -16,42 +16,26 @@
 - Templates globais: ISO 9001:2015 (13 secoes, 72 campos, id=4)
 - Painel de plataforma, auditoria, legal gate, onboarding self-service
 - `user_module_access` — admin concede modulos especificos por usuario
+- **Efetivo:** CRUD de apoio + colaboradores + escala automatica + dashboard + chamada de presenca
 
 ---
 
-## Em desenvolvimento agora
-
-### Controle de Efetivo — Fase 0
-
-Modulo registrado como `"efetivo"` em `src/lib/modules.ts`.
-Acesso atual: somente `ricardo.luize@viracopos.com`.
-Nenhum codigo de UI/API criado ainda.
-
-| # | O que | Status |
-|---|---|---|
-| 1 | Schema Prisma + SQL das tabelas de apoio e colaboradores | ⏳ Proximo |
-| 2 | CRUD tabelas de apoio (turnos, padroes, areas, cargos) | ⏳ |
-| 3 | Listagem de colaboradores + Ficha do Colaborador | ⏳ |
-| 4 | Importador XLSX (carga inicial ~505 colaboradores) | ⏳ |
-
-Specs completas: `_docs/controle-efetivo/`
-
----
-
-## Proximo (depois do efetivo Fase 0)
+## Proximo
 
 | # | O que | Notas |
 |---|---|---|
-| 1 | **Dashboard de checklists** (6.1+) | KPIs: conformidade %, pendentes, atrasados |
-| 2 | **Wizard de onboarding** (2.2) | Campo `onboarding_completed_at` em `companies` |
-| 3 | **Rate limiting** (1.3) | Upstash Redis + `@upstash/ratelimit` |
-| 4 | **Intercorrencias** (6.2) | Novo schema; aguarda definicao dos campos |
+| 1 | **Efetivo Fase 3 — Relatorios** | Frequencia por colaborador/area/turno; absenteismo; horas extras; exportacao |
+| 2 | **Vinculo EXECUTOR→Area** | Campo `areaId` no User para filtro automatico na Chamada |
+| 3 | **Dashboard de checklists** (6.1+) | KPIs: conformidade %, pendentes, atrasados |
+| 4 | **Wizard de onboarding** (2.2) | Campo `onboarding_completed_at` em `companies` |
+| 5 | **Rate limiting** (1.3) | Upstash Redis + `@upstash/ratelimit` |
+| 6 | **Intercorrencias** (6.2) | Novo schema; aguarda definicao dos campos |
 
 ---
 
 ## Depois
 
-- Efetivo Fase 1 (geracao de escala) · Fase 2 (chamada diaria) · Fase 3 (relatorios)
+- Efetivo Fase 4 (importacao XLSX de atualizacoes) · Fase 5 (integracao ponto eletronico)
 - 6.3 Rastreabilidade · 6.4 Planos de Acao · 6.5 Captura
 - 7 IA avancada · 8 WhatsApp (Z-API) · 9 Cron jobs · 10 Sentry · 11 Billing
 
@@ -101,8 +85,18 @@ Specs completas: `_docs/controle-efetivo/`
 6.1  Checklists completo (foto/audio/anotacao por item, IN_PROGRESS, salvar parcial)
 6.6  Oficina (ordens de servico, estoque, ESG)
 UM   user_module_access: controle de acesso por usuario por modulo
+EF0  Efetivo Fase 0: schema (14 modelos) + CRUD de apoio + listagem + ficha do colaborador
+EF1  Efetivo Fase 1: escala automatica (FIXO_SEMANAL + ROTATIVO) + eventos + snapshot/publicacao
+EFD  Efetivo Dashboard: headcount por turno, distribuicao por area, chamada rapida
+EF2  Efetivo Fase 2: /efetivo/chamada — chamada diaria com atraso, saida antecipada,
+     hora extra, troca de turno; campo hora_ajuste; visivel para EXECUTOR/GESTOR/ADMIN
 ```
 
 SQL ja rodado no phpMyAdmin: audit_logs, checklists, checklist_items,
 checklist_item_fields, checklist_executions, execution_field_values,
-companies.feature_audio, execution_item_notes, user_module_access.
+companies.feature_audio, execution_item_notes, user_module_access,
+efetivo_turnos, efetivo_padroes_escala, efetivo_areas, efetivo_cargos,
+efetivo_colaboradores, efetivo_movimentacoes_vinculo, efetivo_tipos_ocorrencia,
+efetivo_ocorrencias, efetivo_encarregados, efetivo_substitutos_encarregado,
+efetivo_vinculos_colaborador, efetivo_eventos (+ enum EfetivoTipoEvento + coluna hora_ajuste),
+efetivo_snapshots, efetivo_escala_publicada.

@@ -1,7 +1,7 @@
 # bemoo — Arquitetura do Sistema
 
 > Documento vivo. Atualizar sempre que um módulo, rota ou padrão novo for adicionado.
-> Última revisão: 2026-06-15 (rev 5)
+> Última revisão: 2026-06-16 (rev 6)
 >
 > Complementa o [PIPELINE.md](./PIPELINE.md) (o quê está feito/planejado) com
 > o **como** o sistema funciona hoje.
@@ -173,6 +173,56 @@ Controla acesso de cada usuário a módulos específicos dentro da empresa. A te
 | `granted_at` | DateTime | |
 | `granted_by` | Int? FK | Id do admin que concedeu |
 Chave única: `(user_id, module_key)`.
+
+### Módulo Efetivo (`efetivo_*`)
+
+Controle de efetivo para ~500 colaboradores com turnos rotativos e fixos.
+
+**Modelos principais:**
+
+| Modelo | Tabela | Descrição |
+|---|---|---|
+| `EfetivoTurno` | `efetivo_turnos` | Turno de trabalho (código, horaInicio, horaFim, cruzaMeiaNoite) |
+| `EfetivoPadraoEscala` | `efetivo_padroes_escala` | Padrão FIXO_SEMANAL (diasSemana) ou ROTATIVO (diasTrabalho+diasFolga) |
+| `EfetivoArea` | `efetivo_areas` | Área / setor do colaborador |
+| `EfetivoCargo` | `efetivo_cargos` | Cargo / função |
+| `EfetivoColaborador` | `efetivo_colaboradores` | Entidade principal; soft delete; vínculo com User opcional |
+| `EfetivoEvento` | `efetivo_eventos` | Override de escala: ausências, ajustes de ponto, trocas de turno |
+| `EfetivoSnapshot` + `EfetivoEscalaPublicada` | `efetivo_snapshots` + `efetivo_escala_publicada` | Escala mensal "congelada" para registro histórico |
+
+**`EfetivoTipoEvento` (enum):**
+```
+FERIAS | FOLGA_FERIADO | FOLGA_DOMINICAL | ATESTADO | AFASTAMENTO_INSS
+FALTA_JUSTIFICADA | FALTA_INJUSTIFICADA
+ATRASO | SAIDA_ANTECIPADA | HORA_EXTRA
+TROCA_TURNO_SAIDA | TROCA_TURNO_ENTRADA
+```
+
+**`EfetivoEvento` — campos relevantes:**
+| Campo | Tipo | Notas |
+|---|---|---|
+| `tipo` | EfetivoTipoEvento | Enum acima |
+| `dataInicio` / `dataFim` | Date (`@db.Date`) | UTC midnight — usar `parseDataLocal()` |
+| `horaAjuste` | VarChar(5)? | Hora "HH:MM" p/ ATRASO, SAIDA_ANTECIPADA, HORA_EXTRA, TROCA_TURNO_ENTRADA |
+| `observacao` | Text? | Motivo, CID, protocolo |
+| `criadoPor` | Int FK → User | Quem registrou o evento |
+
+**Libs centrais do Efetivo:**
+
+| Arquivo | O que exporta |
+|---|---|
+| `src/lib/efetivo-escala.ts` | `calculaDia()` — cálculo puro FIXO_SEMANAL/ROTATIVO; eventos têm prioridade sobre padrão |
+| `src/lib/efetivo-status.ts` | `STATUS_CFG` (cores/labels por status); `STATUS_GRUPO` (agrupa em trabalha/ausencia/folga); `HORA_AJUSTE_LABEL`; `TIPOS_EVENTO_CHAMADA` |
+
+**Algoritmo `calculaDia(padrao, dataAncora, data, eventos)`:**
+1. Itera eventos — se algum cobre `data` → retorna `ev.tipo` como status
+2. FIXO_SEMANAL: checa se dia da semana está em `diasSemana` (string "seg,ter,qua…")
+3. ROTATIVO: `ciclo = diasTrabalho + diasFolga`; `pos = ((diff % ciclo) + ciclo) % ciclo`; `pos < diasTrabalho` → TRABALHA
+
+**Datas UTC obrigatório:** campos `@db.Date` chegam como UTC midnight. Usar `getUTCDay()` e aritmética em ms. Nunca `getDay()` ou `toLocaleDateString()` sem timezone.
+
+**Snapshot/publicação:**
+`POST /api/efetivo/escala/publicar` computa todos os colabs × todos os dias do mês em memória, depois grava com `createMany` dentro de `$transaction` (timeout 30s). Apaga snapshot anterior antes de criar novo (constraint `@@unique([companyId, mes])`).
 
 ### Módulo Oficina (`workshop_*`)
 
@@ -419,6 +469,31 @@ ISO 9001:2015: template em produção, id=4, 13 seções, 72 campos
 | `/api/oficina/pedidos/[id]/consumos/[consumoId]` | DELETE | Estornar consumo |
 | `/api/oficina/dashboard` | GET | KPIs e indicadores ESG da oficina |
 
+### Efetivo
+
+| Rota | Método | Role mínimo | Descrição |
+|---|---|---|---|
+| `/api/efetivo/turnos` | GET, POST | GESTOR | Listar / criar turno |
+| `/api/efetivo/turnos/[id]` | PATCH, DELETE | GESTOR | Editar / arquivar turno |
+| `/api/efetivo/padroes` | GET, POST | GESTOR | Padrões de escala |
+| `/api/efetivo/padroes/[id]` | PATCH, DELETE | GESTOR | Editar / remover padrão |
+| `/api/efetivo/areas` | GET, POST | GESTOR | Áreas |
+| `/api/efetivo/areas/[id]` | PATCH, DELETE | GESTOR | Editar / arquivar área |
+| `/api/efetivo/cargos` | GET, POST | GESTOR | Cargos |
+| `/api/efetivo/cargos/[id]` | PATCH, DELETE | GESTOR | Editar / arquivar cargo |
+| `/api/efetivo/colaboradores` | GET, POST | GESTOR | Listar / criar colaborador |
+| `/api/efetivo/colaboradores/[matricula]` | GET, PATCH | GESTOR | Ficha + editar colaborador |
+| `/api/efetivo/colaboradores/[matricula]/movimentacoes` | POST | GESTOR | Desligamento / readmissão |
+| `/api/efetivo/colaboradores/[matricula]/ocorrencias` | POST | GESTOR | Registrar ocorrência |
+| `/api/efetivo/ocorrencias/[id]` | DELETE | GESTOR | Remover ocorrência (soft) |
+| `/api/efetivo/tipos-ocorrencia` | GET, POST | GESTOR | Tipos de ocorrência |
+| `/api/efetivo/escala` | GET | EXECUTOR | Matriz mensal calculada ao vivo (`?mes=YYYY-MM&turnoId=&areaId=`) |
+| `/api/efetivo/escala/publicar` | POST | GESTOR | Gera/republica snapshot mensal |
+| `/api/efetivo/eventos` | POST | EXECUTOR | Criar evento (ausência, ajuste, troca de turno) |
+| `/api/efetivo/eventos/[id]` | DELETE | GESTOR | Remover evento (soft delete) |
+| `/api/efetivo/chamada` | GET | EXECUTOR | Chamada do dia (`?data=YYYY-MM-DD&turnoId=&areaId=`) — colabs + status calculado |
+| `/api/efetivo/dashboard` | GET | EXECUTOR | KPIs de hoje: contagens, turnos ativos, colaboradores |
+
 ### Upload e IA
 | Rota | Método | Descrição |
 |---|---|---|
@@ -454,7 +529,7 @@ Verificado no layout do grupo de rotas correspondente.
 |---|---|---|
 | `checklists` | `/checklists` | ✅ Em produção |
 | `oficina` | `/oficina` (pedidos, estoque, cadastros, dashboard ESG) | ✅ Em produção |
-| `efetivo` | `/efetivo` | 🔨 Fase 0 em desenvolvimento |
+| `efetivo` | `/efetivo` (dashboard), `/efetivo/chamada`, `/efetivo/escala`, `/efetivo/colaboradores` | ✅ Fases 0-2 em produção |
 | `intercorrencias` | `/intercorrencias` | ⏳ Fase 6.2 |
 | `rastreabilidade` | `/rastreabilidade` | ⏳ Fase 6.3 |
 | `planos` | `/planos` | ⏳ Fase 6.4 |
