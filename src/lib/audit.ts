@@ -77,6 +77,10 @@ export type AuditAction =
   | "efetivo.movimentacao.criada"
   | "efetivo.ocorrencia.criada"
   | "efetivo.ocorrencia.removida"
+  // Efetivo — escala
+  | "efetivo.evento.criado"
+  | "efetivo.evento.removido"
+  | "efetivo.escala.publicada"
 
 // ─── Helper principal ─────────────────────────────────────────────────
 

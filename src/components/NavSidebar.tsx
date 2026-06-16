@@ -9,7 +9,7 @@ import {
   CheckSquare, AlertTriangle, Tag, Target, Inbox, Wrench, Users2,
   LayoutDashboard, LogOut, ChevronRight, Users,
   Building2, BarChart2, ScrollText, UserCircle, X, Layers, History,
-  Package, Settings2,
+  Package, Settings2, CalendarDays,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -104,8 +104,9 @@ export function NavSidebar({ user, enabledModules, onClose }: NavSidebarProps) {
                   {/* Sub-links do módulo efetivo */}
                   {mod.key === "efetivo" && (
                     <>
-                      <NavLink href="/efetivo/colaboradores" icon={Users}    label="Colaboradores" current={pathname} onClick={handleLinkClick} indent />
-                      <NavLink href="/efetivo/cadastros"     icon={Settings2} label="Cadastros"    current={pathname} onClick={handleLinkClick} indent />
+                      <NavLink href="/efetivo/escala"        icon={CalendarDays} label="Escala"        current={pathname} onClick={handleLinkClick} indent />
+                      <NavLink href="/efetivo/colaboradores" icon={Users}        label="Colaboradores" current={pathname} onClick={handleLinkClick} indent />
+                      <NavLink href="/efetivo/cadastros"     icon={Settings2}    label="Cadastros"     current={pathname} onClick={handleLinkClick} indent />
                     </>
                   )}
                 </div>

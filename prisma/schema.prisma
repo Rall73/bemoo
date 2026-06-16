@@ -30,6 +30,15 @@ enum EfetivoTipoMovimentacao {
   READMISSAO
 }
 
+enum EfetivoTipoEvento {
+  FERIAS
+  FOLGA_FERIADO
+  FOLGA_DOMINICAL
+  ATESTADO
+  AFASTAMENTO_INSS
+  FALTA_JUSTIFICADA
+}
+
 enum Plan {
   FREE
   STARTER
@@ -80,6 +89,8 @@ model Company {
   efetivoMovimentacoes   EfetivoMovimentacaoVinculo[]
   efetivoOcorrencias     EfetivoOcorrencia[]
   efetivoEncarregados    EfetivoEncarregado[]
+  efetivoEventos         EfetivoEvento[]
+  efetivoSnapshots       EfetivoSnapshot[]
 
   @@map("companies")
 }
@@ -115,6 +126,8 @@ model User {
   efetivoColaborador   EfetivoColaborador?          @relation("EfetivoUser")
   efetivoMovimentacoes EfetivoMovimentacaoVinculo[] @relation("MovimentacaoRegistradaPor")
   efetivoOcorrencias   EfetivoOcorrencia[]          @relation("OcorrenciaRegistradaPor")
+  efetivoEventos       EfetivoEvento[]              @relation("EventoCriadoPor")
+  efetivoSnapshots     EfetivoSnapshot[]            @relation("SnapshotPublicador")
 
   @@index([companyId])
   @@map("users")
@@ -584,8 +597,9 @@ model EfetivoTurno {
   deletedAt      DateTime? @map("deleted_at")
   deletedBy      Int?      @map("deleted_by")
 
-  company       Company              @relation(fields: [companyId], references: [id])
-  colaboradores EfetivoColaborador[]
+  company         Company                  @relation(fields: [companyId], references: [id])
+  colaboradores   EfetivoColaborador[]
+  escalaPublicada EfetivoEscalaPublicada[]
 
   @@unique([companyId, codigo])
   @@index([companyId])
@@ -678,6 +692,8 @@ model EfetivoColaborador {
   encarregado    EfetivoEncarregado?          @relation("EncarregadoColaborador")
   comoSubstituto EfetivoSubstitutoEncarregado[]
   vinculo        EfetivoVinculoColaborador?   @relation("VinculoColaborador")
+  eventos        EfetivoEvento[]
+  escalaPublicada EfetivoEscalaPublicada[]
 
   @@unique([companyId, matricula])
   @@index([companyId])
@@ -794,6 +810,63 @@ model EfetivoVinculoColaborador {
 
   @@index([encarregadoId])
   @@map("efetivo_vinculos_colaborador")
+}
+
+model EfetivoEvento {
+  id            Int               @id @default(autoincrement())
+  companyId     Int               @map("company_id")
+  colaboradorId Int               @map("colaborador_id")
+  tipo          EfetivoTipoEvento
+  dataInicio    DateTime          @db.Date @map("data_inicio")
+  dataFim       DateTime          @db.Date @map("data_fim")
+  observacao    String?           @db.Text
+  criadoPor     Int               @map("criado_por")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  deletedAt     DateTime?         @map("deleted_at")
+  deletedBy     Int?              @map("deleted_by")
+
+  company     Company            @relation(fields: [companyId],     references: [id])
+  colaborador EfetivoColaborador @relation(fields: [colaboradorId], references: [id])
+  criador     User               @relation("EventoCriadoPor", fields: [criadoPor], references: [id])
+
+  @@index([companyId])
+  @@index([colaboradorId])
+  @@index([dataInicio])
+  @@map("efetivo_eventos")
+}
+
+model EfetivoSnapshot {
+  id           Int      @id @default(autoincrement())
+  companyId    Int      @map("company_id")
+  mes          String   @db.VarChar(7)
+  publicadoPor Int      @map("publicado_por")
+  publicadoEm  DateTime @default(now()) @map("publicado_em")
+
+  company    Company                  @relation(fields: [companyId],    references: [id])
+  publicador User                     @relation("SnapshotPublicador", fields: [publicadoPor], references: [id])
+  linhas     EfetivoEscalaPublicada[]
+
+  @@unique([companyId, mes])
+  @@index([companyId])
+  @@map("efetivo_snapshots")
+}
+
+model EfetivoEscalaPublicada {
+  id            Int      @id @default(autoincrement())
+  snapshotId    Int      @map("snapshot_id")
+  colaboradorId Int      @map("colaborador_id")
+  data          DateTime @db.Date
+  turnoId       Int      @map("turno_id")
+  status        String   @db.VarChar(20)
+
+  snapshot    EfetivoSnapshot    @relation(fields: [snapshotId],    references: [id])
+  colaborador EfetivoColaborador @relation(fields: [colaboradorId], references: [id])
+  turno       EfetivoTurno       @relation(fields: [turnoId],       references: [id])
+
+  @@unique([snapshotId, colaboradorId, data])
+  @@index([snapshotId])
+  @@index([colaboradorId])
+  @@map("efetivo_escala_publicada")
 }
 
 // ─── Módulos habilitados por empresa ─────────────────────────────
