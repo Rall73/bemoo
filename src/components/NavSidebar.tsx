@@ -101,6 +101,13 @@ export function NavSidebar({ user, enabledModules, onClose }: NavSidebarProps) {
                       <NavLink href="/oficina/cadastros" icon={Settings2}   label="Cadastros" current={pathname} onClick={handleLinkClick} indent />
                     </>
                   )}
+                  {/* Sub-links do módulo efetivo */}
+                  {mod.key === "efetivo" && (
+                    <>
+                      <NavLink href="/efetivo/colaboradores" icon={Users}    label="Colaboradores" current={pathname} onClick={handleLinkClick} indent />
+                      <NavLink href="/efetivo/cadastros"     icon={Settings2} label="Cadastros"    current={pathname} onClick={handleLinkClick} indent />
+                    </>
+                  )}
                 </div>
               )
             })}
