@@ -76,3 +76,29 @@
 ## Tabelas no banco que o Prisma conhece mas ainda nao existem no MySQL
 
 Nenhuma no momento — o ultimo `prisma generate` esta sincronizado com o banco apos o SQL desta sprint.
+
+---
+
+## Controle de Efetivo — progresso Fase 0
+
+**SQL rodado no phpMyAdmin em 2026-06-15 (11 tabelas criadas):**
+`efetivo_turnos`, `efetivo_padroes_escala`, `efetivo_areas`, `efetivo_cargos`,
+`efetivo_colaboradores`, `efetivo_movimentacoes_vinculo`, `efetivo_tipos_ocorrencia`,
+`efetivo_ocorrencias`, `efetivo_encarregados`, `efetivo_substitutos_encarregado`,
+`efetivo_vinculos_colaborador`
+
+**`prisma generate` rodado — client sincronizado.**
+
+**Seed rodado com sucesso em 2026-06-15:**
+- 9 turnos, 3 padroes, 5 areas, 16 cargos, 505 colaboradores, 505 movimentacoes
+- 487 colaboradores com data_ancora inferida da Planilha1; 18 com NULL (ferias/afastamento em junho inteiro)
+- data_admissao = 2001-01-01 (placeholder — usuario confirmara depois)
+- Script gerador salvo em `_docs/gen_seed.py`
+
+**Proximos passos (Fase 0):**
+```
+2. CRUD das tabelas de apoio → /efetivo/cadastros
+   (Turnos, Padroes de Escala, Areas, Cargos)
+3. Listagem de colaboradores + Ficha do Colaborador
+   (tela fundadora — dados, vinculo, ocorrencias)
+```

@@ -14,6 +14,22 @@ enum LegalType {
   PRIVACY
 }
 
+enum EfetivoModoPadrao {
+  FIXO_SEMANAL
+  ROTATIVO
+}
+
+enum EfetivoStatusColaborador {
+  ATIVO
+  DESLIGADO
+}
+
+enum EfetivoTipoMovimentacao {
+  ADMISSAO
+  DESLIGAMENTO
+  READMISSAO
+}
+
 enum Plan {
   FREE
   STARTER
@@ -55,6 +71,16 @@ model Company {
   workshopPauseReasons WorkshopPauseReason[]
   workshopOrders       WorkshopServiceOrder[]
 
+  efetivoTurnos          EfetivoTurno[]
+  efetivoPadroes         EfetivoPadraoEscala[]
+  efetivoAreas           EfetivoArea[]
+  efetivoCargos          EfetivoCargo[]
+  efetivoColaboradores   EfetivoColaborador[]
+  efetivoTiposOcorrencia EfetivoTipoOcorrencia[]
+  efetivoMovimentacoes   EfetivoMovimentacaoVinculo[]
+  efetivoOcorrencias     EfetivoOcorrencia[]
+  efetivoEncarregados    EfetivoEncarregado[]
+
   @@map("companies")
 }
 
@@ -85,6 +111,10 @@ model User {
 
   moduleAccess        UserModuleAccess[] @relation("UMAUser")
   moduleAccessGranted UserModuleAccess[] @relation("UMAGrantor")
+
+  efetivoColaborador   EfetivoColaborador?          @relation("EfetivoUser")
+  efetivoMovimentacoes EfetivoMovimentacaoVinculo[] @relation("MovimentacaoRegistradaPor")
+  efetivoOcorrencias   EfetivoOcorrencia[]          @relation("OcorrenciaRegistradaPor")
 
   @@index([companyId])
   @@map("users")
@@ -538,6 +568,232 @@ model UserModuleAccess {
   @@index([userId])
   @@index([companyId])
   @@map("user_module_access")
+}
+
+// ─── Controle de Efetivo ─────────────────────────────────────────
+
+model EfetivoTurno {
+  id             Int       @id @default(autoincrement())
+  companyId      Int       @map("company_id")
+  codigo         String    @db.VarChar(10)
+  horaInicio     String    @db.VarChar(5)  @map("hora_inicio")
+  horaFim        String    @db.VarChar(5)  @map("hora_fim")
+  cruzaMeiaNoite Boolean   @default(false) @map("cruza_meia_noite")
+  ativo          Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  deletedAt      DateTime? @map("deleted_at")
+  deletedBy      Int?      @map("deleted_by")
+
+  company       Company              @relation(fields: [companyId], references: [id])
+  colaboradores EfetivoColaborador[]
+
+  @@unique([companyId, codigo])
+  @@index([companyId])
+  @@map("efetivo_turnos")
+}
+
+model EfetivoPadraoEscala {
+  id           Int               @id @default(autoincrement())
+  companyId    Int               @map("company_id")
+  nome         String            @db.VarChar(100)
+  modo         EfetivoModoPadrao
+  diasSemana   String?           @db.VarChar(50) @map("dias_semana")
+  diasTrabalho Int?              @map("dias_trabalho")
+  diasFolga    Int?              @map("dias_folga")
+  ativo        Boolean           @default(true)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  deletedAt    DateTime?         @map("deleted_at")
+  deletedBy    Int?              @map("deleted_by")
+
+  company       Company              @relation(fields: [companyId], references: [id])
+  colaboradores EfetivoColaborador[]
+
+  @@index([companyId])
+  @@map("efetivo_padroes_escala")
+}
+
+model EfetivoArea {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @map("company_id")
+  nome      String    @db.VarChar(200)
+  areaPaiId Int?      @map("area_pai_id")
+  ativo     Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy Int?      @map("deleted_by")
+
+  company       Company              @relation(fields: [companyId], references: [id])
+  areaPai       EfetivoArea?         @relation("AreaHierarquia", fields: [areaPaiId], references: [id])
+  subareas      EfetivoArea[]        @relation("AreaHierarquia")
+  colaboradores EfetivoColaborador[]
+
+  @@index([companyId])
+  @@index([areaPaiId])
+  @@map("efetivo_areas")
+}
+
+model EfetivoCargo {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @map("company_id")
+  nome      String    @db.VarChar(200)
+  ativo     Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy Int?      @map("deleted_by")
+
+  company       Company              @relation(fields: [companyId], references: [id])
+  colaboradores EfetivoColaborador[]
+
+  @@index([companyId])
+  @@map("efetivo_cargos")
+}
+
+model EfetivoColaborador {
+  id               Int                      @id @default(autoincrement())
+  companyId        Int                      @map("company_id")
+  matricula        String                   @db.VarChar(20)
+  nome             String                   @db.VarChar(200)
+  cargoId          Int                      @map("cargo_id")
+  areaId           Int                      @map("area_id")
+  padraoEscalaId   Int                      @map("padrao_escala_id")
+  turnoId          Int                      @map("turno_id")
+  dataAncora       DateTime?                @db.Date @map("data_ancora")
+  status           EfetivoStatusColaborador @default(ATIVO)
+  dataAdmissao     DateTime                 @db.Date @map("data_admissao")
+  dataDesligamento DateTime?                @db.Date @map("data_desligamento")
+  userId           Int?                     @unique @map("user_id")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+  deletedAt        DateTime?                @map("deleted_at")
+  deletedBy        Int?                     @map("deleted_by")
+
+  company        Company                      @relation(fields: [companyId],     references: [id])
+  cargo          EfetivoCargo                 @relation(fields: [cargoId],        references: [id])
+  area           EfetivoArea                  @relation(fields: [areaId],         references: [id])
+  padraoEscala   EfetivoPadraoEscala          @relation(fields: [padraoEscalaId], references: [id])
+  turno          EfetivoTurno                 @relation(fields: [turnoId],        references: [id])
+  user           User?                        @relation("EfetivoUser", fields: [userId], references: [id])
+  movimentacoes  EfetivoMovimentacaoVinculo[]
+  ocorrencias    EfetivoOcorrencia[]
+  encarregado    EfetivoEncarregado?          @relation("EncarregadoColaborador")
+  comoSubstituto EfetivoSubstitutoEncarregado[]
+  vinculo        EfetivoVinculoColaborador?   @relation("VinculoColaborador")
+
+  @@unique([companyId, matricula])
+  @@index([companyId])
+  @@index([cargoId])
+  @@index([areaId])
+  @@index([turnoId])
+  @@map("efetivo_colaboradores")
+}
+
+model EfetivoMovimentacaoVinculo {
+  id            Int                     @id @default(autoincrement())
+  companyId     Int                     @map("company_id")
+  colaboradorId Int                     @map("colaborador_id")
+  tipo          EfetivoTipoMovimentacao
+  data          DateTime                @db.Date
+  motivo        String?                 @db.Text
+  registradoPor Int                     @map("registrado_por")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  deletedAt     DateTime?               @map("deleted_at")
+  deletedBy     Int?                    @map("deleted_by")
+
+  company     Company            @relation(fields: [companyId],     references: [id])
+  colaborador EfetivoColaborador @relation(fields: [colaboradorId], references: [id])
+  registrador User               @relation("MovimentacaoRegistradaPor", fields: [registradoPor], references: [id])
+
+  @@index([companyId])
+  @@index([colaboradorId])
+  @@map("efetivo_movimentacoes_vinculo")
+}
+
+model EfetivoTipoOcorrencia {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @map("company_id")
+  nome      String    @db.VarChar(200)
+  ativo     Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy Int?      @map("deleted_by")
+
+  company     Company             @relation(fields: [companyId], references: [id])
+  ocorrencias EfetivoOcorrencia[]
+
+  @@index([companyId])
+  @@map("efetivo_tipos_ocorrencia")
+}
+
+model EfetivoOcorrencia {
+  id            Int       @id @default(autoincrement())
+  companyId     Int       @map("company_id")
+  colaboradorId Int       @map("colaborador_id")
+  tipoId        Int       @map("tipo_id")
+  data          DateTime  @db.Date
+  descricao     String    @db.Text
+  anexoUrl      String?   @db.VarChar(500) @map("anexo_url")
+  registradoPor Int       @map("registrado_por")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  deletedAt     DateTime? @map("deleted_at")
+  deletedBy     Int?      @map("deleted_by")
+
+  company     Company               @relation(fields: [companyId],     references: [id])
+  colaborador EfetivoColaborador    @relation(fields: [colaboradorId], references: [id])
+  tipo        EfetivoTipoOcorrencia @relation(fields: [tipoId],        references: [id])
+  registrador User                  @relation("OcorrenciaRegistradaPor", fields: [registradoPor], references: [id])
+
+  @@index([companyId])
+  @@index([colaboradorId])
+  @@map("efetivo_ocorrencias")
+}
+
+model EfetivoEncarregado {
+  id            Int       @id @default(autoincrement())
+  companyId     Int       @map("company_id")
+  colaboradorId Int       @unique @map("colaborador_id")
+  ativo         Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  deletedAt     DateTime? @map("deleted_at")
+  deletedBy     Int?      @map("deleted_by")
+
+  company     Company                        @relation(fields: [companyId],     references: [id])
+  colaborador EfetivoColaborador             @relation("EncarregadoColaborador", fields: [colaboradorId], references: [id])
+  substitutos EfetivoSubstitutoEncarregado[]
+  vinculos    EfetivoVinculoColaborador[]
+
+  @@index([companyId])
+  @@map("efetivo_encarregados")
+}
+
+// Sem soft delete — tabela de configuracao N:N (max 3 substitutos por encarregado)
+model EfetivoSubstitutoEncarregado {
+  id            Int      @id @default(autoincrement())
+  encarregadoId Int      @map("encarregado_id")
+  colaboradorId Int      @map("colaborador_id")
+  ordem         Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  encarregado EfetivoEncarregado @relation(fields: [encarregadoId], references: [id])
+  colaborador EfetivoColaborador @relation(fields: [colaboradorId], references: [id])
+
+  @@unique([encarregadoId, colaboradorId])
+  @@index([encarregadoId])
+  @@map("efetivo_substitutos_encarregado")
+}
+
+model EfetivoVinculoColaborador {
+  id            Int       @id @default(autoincrement())
+  colaboradorId Int       @unique @map("colaborador_id")
+  encarregadoId Int       @map("encarregado_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  deletedAt     DateTime? @map("deleted_at")
+  deletedBy     Int?      @map("deleted_by")
+
+  colaborador EfetivoColaborador @relation("VinculoColaborador", fields: [colaboradorId], references: [id])
+  encarregado EfetivoEncarregado @relation(fields: [encarregadoId], references: [id])
+
+  @@index([encarregadoId])
+  @@map("efetivo_vinculos_colaborador")
 }
 
 // ─── Módulos habilitados por empresa ─────────────────────────────

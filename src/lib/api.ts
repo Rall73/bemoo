@@ -32,6 +32,10 @@ export function notFound(message = "Recurso não encontrado.") {
   return NextResponse.json({ ok: false, message }, { status: 404 })
 }
 
+export function conflict(message: string) {
+  return NextResponse.json({ ok: false, message }, { status: 409 })
+}
+
 export function serverError(message = "Erro interno do servidor.") {
   return NextResponse.json({ ok: false, message }, { status: 500 })
 }

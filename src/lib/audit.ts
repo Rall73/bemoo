@@ -59,6 +59,19 @@ export type AuditAction =
   // Oficina — estoque
   | "oficina.consumo.registrado"
   | "oficina.consumo.removido"
+  // Efetivo — cadastros
+  | "efetivo.turno.criado"
+  | "efetivo.turno.editado"
+  | "efetivo.turno.removido"
+  | "efetivo.padrao.criado"
+  | "efetivo.padrao.editado"
+  | "efetivo.padrao.removido"
+  | "efetivo.area.criada"
+  | "efetivo.area.editada"
+  | "efetivo.area.removida"
+  | "efetivo.cargo.criado"
+  | "efetivo.cargo.editado"
+  | "efetivo.cargo.removido"
 
 // ─── Helper principal ─────────────────────────────────────────────────
 
