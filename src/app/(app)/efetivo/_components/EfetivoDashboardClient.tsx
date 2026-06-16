@@ -168,6 +168,7 @@ export function EfetivoDashboardClient({ turnos, role }: Props) {
       const json = await res.json()
       if (!json.ok) { setEvErro(json.message ?? "Erro ao salvar."); return }
       setModalColab(null)
+      setChamadaAberta(false)
       fetchDash()
     } catch {
       setEvErro("Erro de rede.")
@@ -179,7 +180,7 @@ export function EfetivoDashboardClient({ turnos, role }: Props) {
   async function removerEvento(id: number) {
     if (!confirm("Remover este registro? O colaborador voltará ao status calculado pela escala.")) return
     const res = await fetch(`/api/efetivo/eventos/${id}`, { method: "DELETE" })
-    if (res.ok) fetchDash()
+    if (res.ok) { setChamadaAberta(false); fetchDash() }
   }
 
   // ─── Helpers de contagem para abas da chamada ────────────────────

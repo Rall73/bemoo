@@ -13,6 +13,7 @@ const zEvento = z.object({
     "ATESTADO",
     "AFASTAMENTO_INSS",
     "FALTA_JUSTIFICADA",
+    "FALTA_INJUSTIFICADA",
   ]),
   dataInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dataFim:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
