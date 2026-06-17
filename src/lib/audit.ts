@@ -73,7 +73,9 @@ export type AuditAction =
   | "efetivo.cargo.editado"
   | "efetivo.cargo.removido"
   // Efetivo — colaboradores
+  | "efetivo.colaborador.criado"
   | "efetivo.colaborador.editado"
+  | "efetivo.ancora.alterada"
   | "efetivo.movimentacao.criada"
   | "efetivo.ocorrencia.criada"
   | "efetivo.ocorrencia.removida"

@@ -64,31 +64,48 @@ export default async function FichaPage({ params }: { params: Promise<{ matricul
 
   if (!colab) notFound()
 
+  const ancoraHistoricoRaw = await prisma.efetivoAncoraHistorico.findMany({
+    where:   { colaboradorId: colab!.id },
+    orderBy: { dataVigencia: "desc" },
+    select:  {
+      id: true, dataAncora: true, dataVigencia: true, createdAt: true,
+      criador: { select: { name: true } },
+    },
+  })
+  const ancoraHistorico = ancoraHistoricoRaw.map((h) => ({
+    id:            h.id,
+    dataAncora:    h.dataAncora.toISOString().slice(0, 10),
+    dataVigencia:  h.dataVigencia.toISOString().slice(0, 10),
+    criadoEm:      h.createdAt.toISOString(),
+    criadoPorNome: h.criador.name,
+  }))
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <FichaColaboradorClient
         colaborador={{
-          id:              colab!.id,
-          matricula:       colab!.matricula,
-          nome:            colab!.nome,
-          status:          colab!.status as "ATIVO" | "DESLIGADO",
-          dataAdmissao:    colab!.dataAdmissao.toISOString(),
-          dataDesligamento:colab!.dataDesligamento?.toISOString() ?? null,
-          dataAncora:      colab!.dataAncora?.toISOString() ?? null,
-          cargo:           colab!.cargo,
-          area:            colab!.area as any,
-          turno:           colab!.turno,
-          padraoEscala:    colab!.padraoEscala as any,
-          movimentacoes:   colab!.movimentacoes.map((m) => ({
+          id:              colab.id,
+          matricula:       colab.matricula,
+          nome:            colab.nome,
+          status:          colab.status as "ATIVO" | "DESLIGADO",
+          dataAdmissao:    colab.dataAdmissao.toISOString(),
+          dataDesligamento:colab.dataDesligamento?.toISOString() ?? null,
+          dataAncora:      colab.dataAncora?.toISOString() ?? null,
+          cargo:           colab.cargo,
+          area:            colab.area as any,
+          turno:           colab.turno,
+          padraoEscala:    colab.padraoEscala as any,
+          movimentacoes:   colab.movimentacoes.map((m) => ({
             ...m,
             data:      m.data.toISOString(),
             createdAt: m.createdAt.toISOString(),
           })),
-          ocorrencias: colab!.ocorrencias.map((o) => ({
+          ocorrencias: colab.ocorrencias.map((o) => ({
             ...o,
             data:      o.data.toISOString(),
             createdAt: o.createdAt.toISOString(),
           })),
+          ancoraHistorico,
         }}
         cargos={cargos}
         areas={areas}

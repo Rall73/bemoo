@@ -50,6 +50,14 @@ interface Ocorrencia {
   registrador: { name: string }
 }
 
+interface AncoraHistoricoItem {
+  id:            number
+  dataAncora:    string
+  dataVigencia:  string
+  criadoEm:      string
+  criadoPorNome: string
+}
+
 interface ColaboradorProps {
   id:              number
   matricula:       string
@@ -64,6 +72,7 @@ interface ColaboradorProps {
   padraoEscala:    PadraoFull
   movimentacoes:   Movimentacao[]
   ocorrencias:     Ocorrencia[]
+  ancoraHistorico: AncoraHistoricoItem[]
 }
 
 interface Props {
@@ -101,7 +110,8 @@ export function FichaColaboradorClient({
   colaborador: inicial, cargos, areas, turnos, padroes, tiposOcorrencia, role,
 }: Props) {
   const router = useRouter()
-  const [colab, setColab] = useState(inicial)
+  const [colab,           setColab]           = useState(inicial)
+  const [ancoraHistorico, setAncoraHistorico] = useState<AncoraHistoricoItem[]>(inicial.ancoraHistorico)
   const isGestor = role === "ADMIN" || role === "GESTOR"
 
   return (
@@ -148,6 +158,17 @@ export function FichaColaboradorClient({
         onUpdate={(updated) => setColab((prev) => ({ ...prev, ...updated }))}
         onOcorrenciaAdded={(oc) => setColab((prev) => ({ ...prev, ocorrencias: [oc, ...prev.ocorrencias] }))}
       />
+
+      {/* Bloco âncora — só para padrão ROTATIVO */}
+      {colab.padraoEscala.modo === "ROTATIVO" && (
+        <BlocoAncoraHistorico
+          matricula={colab.matricula}
+          dataAncoraBase={colab.dataAncora}
+          historico={ancoraHistorico}
+          isGestor={isGestor}
+          onAdded={(item) => setAncoraHistorico((prev) => [item, ...prev])}
+        />
+      )}
 
       {/* Bloco 2 — Vínculo */}
       <BlocoVinculo
@@ -407,6 +428,115 @@ function BlocoDadosCadastrais({
             </div>
           </div>
         </div>
+      )}
+    </section>
+  )
+}
+
+// ─── Bloco âncora — histórico de data-âncora ─────────────────────────────────
+
+function BlocoAncoraHistorico({
+  matricula, dataAncoraBase, historico, isGestor, onAdded,
+}: {
+  matricula:      string
+  dataAncoraBase: string | null
+  historico:      AncoraHistoricoItem[]
+  isGestor:       boolean
+  onAdded:        (item: AncoraHistoricoItem) => void
+}) {
+  const [showForm,    setShowForm]    = useState(false)
+  const [saving,      setSaving]      = useState(false)
+  const [erro,        setErro]        = useState<string | null>(null)
+  const [fAncora,     setFAncora]     = useState("")
+  const [fVigencia,   setFVigencia]   = useState("")
+
+  async function salvar() {
+    if (!fAncora || !fVigencia) { setErro("Preencha a nova âncora e a data de vigência."); return }
+    if (fVigencia < fAncora) { setErro("A vigência não pode ser anterior à nova âncora."); return }
+    setSaving(true); setErro(null)
+    try {
+      const res  = await fetch(`/api/efetivo/colaboradores/${matricula}/ancora`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ dataAncora: fAncora, dataVigencia: fVigencia }),
+      })
+      const json = await res.json()
+      if (!json.ok) { setErro(json.message ?? "Erro ao salvar."); return }
+      onAdded({ ...json.data, criadoEm: new Date().toISOString(), criadoPorNome: "você" })
+      setShowForm(false); setFAncora(""); setFVigencia("")
+    } catch { setErro("Erro de conexão.") } finally { setSaving(false) }
+  }
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Data-âncora do ciclo rotativo</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Âncora base: <span className="font-medium text-gray-600">{dataAncoraBase ? formatarData(dataAncoraBase) : "não definida"}</span>
+            {" · "}Alterações valem a partir da data de vigência informada — datas anteriores não mudam.
+          </p>
+        </div>
+        {isGestor && (
+          <button
+            onClick={() => { setShowForm((v) => !v); setErro(null) }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
+          >
+            <Plus size={14} /> Alterar âncora
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <div className="border border-gray-200 rounded-lg p-4 space-y-3 mb-4 bg-white">
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            A nova âncora vale apenas para dias ≥ data de vigência. O cálculo de dias anteriores permanece inalterado.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Nova data-âncora <span className="text-red-500">*</span></label>
+              <input type="date" value={fAncora} onChange={(e) => setFAncora(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded text-gray-800 bg-white" />
+              <p className="text-[11px] text-gray-400 mt-1">Primeiro dia do novo ciclo (dia 0 da rotação).</p>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Vigente a partir de <span className="text-red-500">*</span></label>
+              <input type="date" value={fVigencia} onChange={(e) => setFVigencia(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded text-gray-800 bg-white" />
+              <p className="text-[11px] text-gray-400 mt-1">Datas anteriores usam a âncora antiga.</p>
+            </div>
+          </div>
+          {erro && <p className="text-sm text-red-600">{erro}</p>}
+          <div className="flex gap-2">
+            <button onClick={salvar} disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-sm rounded hover:bg-primary/90 disabled:opacity-60">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Salvar
+            </button>
+            <button onClick={() => { setShowForm(false); setErro(null) }}
+              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {historico.length === 0 ? (
+        <p className="text-sm text-gray-400 py-4 text-center">Nenhuma alteração de âncora registrada.</p>
+      ) : (
+        <ul className="space-y-2">
+          {historico.map((h) => (
+            <li key={h.id} className="flex items-center gap-3 px-4 py-2.5 border border-gray-100 rounded-lg bg-white text-sm">
+              <div className="flex-1 min-w-0">
+                <span className="font-medium text-gray-800">Nova âncora: {formatarData(h.dataAncora)}</span>
+                <span className="text-gray-500 mx-2">·</span>
+                <span className="text-gray-600">Vigente a partir de {formatarData(h.dataVigencia)}</span>
+              </div>
+              <span className="text-xs text-gray-400 flex-shrink-0">
+                {h.criadoPorNome} · {formatarData(h.criadoEm)}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   )

@@ -3,6 +3,20 @@ import { prisma }       from "@/lib/prisma"
 import { hojeNoBrasil } from "@/lib/date"
 import { parseMes, diasDoMes, calculaDia, diaSemanaAbrev } from "@/lib/efetivo-escala"
 
+// Resolve a dataAncora efetiva para um dia `d` respeitando o histórico de alterações.
+// O histórico deve estar ordenado por dataVigencia crescente.
+function resolveAncora(
+  base: Date | null,
+  historico: { dataAncora: Date; dataVigencia: Date }[],
+  d: Date
+): Date | null {
+  let ancora = base
+  for (const h of historico) {
+    if (h.dataVigencia.getTime() <= d.getTime()) ancora = h.dataAncora
+  }
+  return ancora
+}
+
 export const GET = withAuth(async (req, session) => {
   const { searchParams } = new URL(req.url)
 
@@ -69,6 +83,19 @@ export const GET = withAuth(async (req, session) => {
     }),
   ])
 
+  // Carrega histórico de âncoras para resolver a âncora correta por dia (sem retroatividade)
+  const ancoraMap = new Map<number, { dataAncora: Date; dataVigencia: Date }[]>()
+  const ancoraHistorico = await prisma.efetivoAncoraHistorico.findMany({
+    where:   { companyId, colaboradorId: { in: colaboradores.map((c) => c.id) } },
+    select:  { colaboradorId: true, dataAncora: true, dataVigencia: true },
+    orderBy: { dataVigencia: "asc" },
+  })
+  for (const h of ancoraHistorico) {
+    const list = ancoraMap.get(h.colaboradorId) ?? []
+    list.push({ dataAncora: h.dataAncora, dataVigencia: h.dataVigencia })
+    ancoraMap.set(h.colaboradorId, list)
+  }
+
   // Agrupar eventos por colaborador para busca O(1) no cálculo
   const evMap = new Map<number, { tipo: string; dataInicio: Date; dataFim: Date }[]>()
   for (const ev of eventos) {
@@ -86,7 +113,12 @@ export const GET = withAuth(async (req, session) => {
     escala:    Object.fromEntries(
       diasDates.map((d) => [
         d.getUTCDate(),
-        calculaDia(c.padraoEscala, c.dataAncora, d, evMap.get(c.id) ?? []),
+        calculaDia(
+          c.padraoEscala,
+          resolveAncora(c.dataAncora, ancoraMap.get(c.id) ?? [], d),
+          d,
+          evMap.get(c.id) ?? []
+        ),
       ])
     ),
   }))

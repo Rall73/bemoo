@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { ChevronLeft, ChevronRight, CalendarDays, Plus, X, Loader2, CheckCircle2, Search } from "lucide-react"
+import { ChevronLeft, ChevronRight, CalendarDays, Plus, X, Loader2, CheckCircle2, Search, Printer, Download } from "lucide-react"
 import { formatarData } from "@/lib/date"
 import { STATUS_CFG, TIPOS_EVENTO_TODOS } from "@/lib/efetivo-status"
 
@@ -43,6 +43,40 @@ interface ModalState {
 
 // STATUS_CFG e TIPOS_EVENTO importados de @/lib/efetivo-status
 const TIPOS_EVENTO = TIPOS_EVENTO_TODOS
+
+// ─── Export helpers ─────────────────────────────────────────────────────────
+
+function exportarCSV(dados: EscalaDados, colaboradoresVisiveis: ColabEscala[]) {
+  const labelsStatus: Record<string, string> = {}
+  Object.entries(STATUS_CFG).forEach(([k, v]) => { labelsStatus[k] = v.full })
+
+  const header = [
+    "Matricula", "Nome", "Turno", "Area",
+    ...dados.dias.map((d, i) => `${d}/${dados.diasSemana[i]}`),
+  ]
+
+  const rows = colaboradoresVisiveis.map((c) => [
+    c.matricula,
+    c.nome,
+    c.turno.codigo,
+    c.area.nome,
+    ...dados.dias.map((d) => labelsStatus[c.escala[d]] ?? c.escala[d] ?? ""),
+  ])
+
+  const csvContent = [header, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
+    .join("\r\n")
+
+  const [y, m] = dados.mes.split("-")
+  const nomeArquivo = `escala_${y}_${m}.csv`
+  const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8;" })
+  const url  = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href     = url
+  link.download = nomeArquivo
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -212,7 +246,17 @@ export function EscalaClient({ mesInicial, turnos, areas, role }: Props) {
   // ─── Render ───────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <>
+    <style>{`
+      @media print {
+        @page { size: landscape; margin: 1cm; }
+        body > * { display: none !important; }
+        #escala-print-area { display: block !important; }
+        #escala-print-area table { font-size: 8px; }
+        #escala-print-area th, #escala-print-area td { padding: 2px 3px; }
+      }
+    `}</style>
+    <div id="escala-print-area" className="flex flex-col h-full min-h-0">
 
       {/* ── Cabeçalho ─────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-6 py-3 border-b border-gray-200 bg-white flex items-center gap-3 flex-wrap">
@@ -227,6 +271,29 @@ export function EscalaClient({ mesInicial, turnos, areas, role }: Props) {
             </span>
           )}
           {pubErro && <span className="text-xs text-red-600">{pubErro}</span>}
+
+          {/* Exportar Excel */}
+          {dados && (
+            <button
+              onClick={() => exportarCSV(dados, colaboradoresVisiveis)}
+              title="Exportar para Excel (CSV)"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-600 rounded-soft hover:bg-gray-50 transition-colors"
+            >
+              <Download size={13} />
+              Excel
+            </button>
+          )}
+
+          {/* Imprimir */}
+          <button
+            onClick={() => window.print()}
+            title="Imprimir escala"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-600 rounded-soft hover:bg-gray-50 transition-colors print:hidden"
+          >
+            <Printer size={13} />
+            Imprimir
+          </button>
+
           {podeEditar && (
             <button
               onClick={publicarEscala}
@@ -360,7 +427,7 @@ export function EscalaClient({ mesInicial, turnos, areas, role }: Props) {
       ) : (
         <div className="flex-1 overflow-auto">
           <table className="border-collapse text-xs">
-            <thead>
+            <thead className="sticky top-0 z-30 bg-white">
               <tr>
                 <th className="sticky left-0 z-20 bg-white border-b-2 border-r border-gray-200 px-3 py-2 text-left font-medium text-gray-500 min-w-[230px] whitespace-nowrap">
                   Colaborador
@@ -554,5 +621,6 @@ export function EscalaClient({ mesInicial, turnos, areas, role }: Props) {
         </div>
       )}
     </div>
+    </>
   )
 }

@@ -97,6 +97,7 @@ model Company {
   efetivoEncarregados    EfetivoEncarregado[]
   efetivoEventos         EfetivoEvento[]
   efetivoSnapshots       EfetivoSnapshot[]
+  efetivoAncoraHistorico EfetivoAncoraHistorico[]
 
   @@map("companies")
 }
@@ -133,6 +134,7 @@ model User {
   efetivoMovimentacoes EfetivoMovimentacaoVinculo[] @relation("MovimentacaoRegistradaPor")
   efetivoOcorrencias   EfetivoOcorrencia[]          @relation("OcorrenciaRegistradaPor")
   efetivoEventos       EfetivoEvento[]              @relation("EventoCriadoPor")
+  efetivoAncoraHistorico EfetivoAncoraHistorico[]   @relation("AncoraHistoricoCriador")
   efetivoSnapshots     EfetivoSnapshot[]            @relation("SnapshotPublicador")
 
   @@index([companyId])
@@ -700,6 +702,7 @@ model EfetivoColaborador {
   vinculo        EfetivoVinculoColaborador?   @relation("VinculoColaborador")
   eventos        EfetivoEvento[]
   escalaPublicada EfetivoEscalaPublicada[]
+  ancoraHistorico EfetivoAncoraHistorico[]
 
   @@unique([companyId, matricula])
   @@index([companyId])
@@ -874,6 +877,24 @@ model EfetivoEscalaPublicada {
   @@index([snapshotId])
   @@index([colaboradorId])
   @@map("efetivo_escala_publicada")
+}
+
+model EfetivoAncoraHistorico {
+  id            Int      @id @default(autoincrement())
+  companyId     Int      @map("company_id")
+  colaboradorId Int      @map("colaborador_id")
+  dataAncora    DateTime @db.Date @map("data_ancora")
+  dataVigencia  DateTime @db.Date @map("data_vigencia")
+  criadoPor     Int      @map("criado_por")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  company     Company            @relation(fields: [companyId],     references: [id])
+  colaborador EfetivoColaborador @relation(fields: [colaboradorId], references: [id])
+  criador     User               @relation("AncoraHistoricoCriador", fields: [criadoPor], references: [id])
+
+  @@index([colaboradorId])
+  @@index([companyId])
+  @@map("efetivo_ancora_historico")
 }
 
 // ─── Módulos habilitados por empresa ─────────────────────────────

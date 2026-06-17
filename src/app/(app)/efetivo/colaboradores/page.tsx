@@ -12,7 +12,7 @@ export default async function ColaboradoresPage() {
 
   const companyId = session.user.companyId as number
 
-  const [colaboradores, areas, turnos] = await Promise.all([
+  const [colaboradores, areas, turnos, cargos, padroes] = await Promise.all([
     prisma.efetivoColaborador.findMany({
       where:   { companyId, deletedAt: null },
       orderBy: { nome: "asc" },
@@ -33,6 +33,14 @@ export default async function ColaboradoresPage() {
     prisma.efetivoTurno.findMany({
       where: { companyId, deletedAt: null }, orderBy: { codigo: "asc" },
       select: { id: true, codigo: true },
+    }),
+    prisma.efetivoCargo.findMany({
+      where: { companyId, deletedAt: null }, orderBy: { nome: "asc" },
+      select: { id: true, nome: true },
+    }),
+    prisma.efetivoPadraoEscala.findMany({
+      where: { companyId, deletedAt: null }, orderBy: { nome: "asc" },
+      select: { id: true, nome: true, modo: true },
     }),
   ])
 
@@ -59,6 +67,9 @@ export default async function ColaboradoresPage() {
         }))}
         areas={areas}
         turnos={turnos}
+        cargos={cargos}
+        padroes={padroes}
+        role={session.user.role}
       />
     </div>
   )
