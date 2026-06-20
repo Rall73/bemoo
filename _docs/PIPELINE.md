@@ -1,6 +1,6 @@
 # bemoo — Pipeline de Desenvolvimento
 
-> Ultima revisao: 2026-06-16
+> Ultima revisao: 2026-06-20
 > Detalhe completo de cada fase: historico preservado abaixo em "Fases concluidas".
 
 ---
@@ -17,6 +17,9 @@
 - Painel de plataforma, auditoria, legal gate, onboarding self-service
 - `user_module_access` — admin concede modulos especificos por usuario
 - **Efetivo:** CRUD de apoio + colaboradores + escala automatica + dashboard + chamada de presenca
+- **Efetivo escala:** cabecalho fixo, exportacao CSV/Excel, impressao, cadastro rapido de colaborador
+- **Efetivo ancora historico:** alteracao de data-ancora com vigencia nao-retroativa
+- **Auth:** cadastro publico bloqueado; fluxo de convite com verificacao global de e-mail
 
 ---
 
@@ -90,6 +93,13 @@ EF1  Efetivo Fase 1: escala automatica (FIXO_SEMANAL + ROTATIVO) + eventos + sna
 EFD  Efetivo Dashboard: headcount por turno, distribuicao por area, chamada rapida
 EF2  Efetivo Fase 2: /efetivo/chamada — chamada diaria com atraso, saida antecipada,
      hora extra, troca de turno; campo hora_ajuste; visivel para EXECUTOR/GESTOR/ADMIN
+EF2+ Efetivo escala melhorias: cabecalho fixo, exportacao CSV/Excel, impressao,
+     modal de cadastro de colaborador direto na listagem
+EF-ANCORA  Historico de data-ancora com vigencia nao-retroativa (efetivo_ancora_historico);
+           resolveAncora() na API de escala; blocoAncoraHistorico na ficha do colaborador
+SEC  Bloqueio de cadastro publico: /api/auth/register retorna 403, /cadastro fechada,
+     Google OAuth bloqueia emails desconhecidos; convite verifica email globalmente;
+     aceitar-convite redireciona para /login?novo=1 em caso de falha no auto-login
 ```
 
 SQL ja rodado no phpMyAdmin: audit_logs, checklists, checklist_items,
@@ -99,4 +109,4 @@ efetivo_turnos, efetivo_padroes_escala, efetivo_areas, efetivo_cargos,
 efetivo_colaboradores, efetivo_movimentacoes_vinculo, efetivo_tipos_ocorrencia,
 efetivo_ocorrencias, efetivo_encarregados, efetivo_substitutos_encarregado,
 efetivo_vinculos_colaborador, efetivo_eventos (+ enum EfetivoTipoEvento + coluna hora_ajuste),
-efetivo_snapshots, efetivo_escala_publicada.
+efetivo_snapshots, efetivo_escala_publicada, efetivo_ancora_historico.

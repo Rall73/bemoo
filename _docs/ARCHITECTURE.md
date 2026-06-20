@@ -1,7 +1,7 @@
 # bemoo — Arquitetura do Sistema
 
 > Documento vivo. Atualizar sempre que um módulo, rota ou padrão novo for adicionado.
-> Última revisão: 2026-06-16 (rev 6)
+> Última revisão: 2026-06-20 (rev 7)
 >
 > Complementa o [PIPELINE.md](./PIPELINE.md) (o quê está feito/planejado) com
 > o **como** o sistema funciona hoje.
@@ -40,7 +40,7 @@ src/
         logs/           → audit logs paginados
       oficina/          → módulo de ordens de serviço, estoque e indicadores ESG
       dashboard/        → página inicial do usuário
-    (auth)/             → login, cadastro, aceitar-convite, redefinir-senha
+    (auth)/             → login (LoginForm.tsx client), cadastro (fechado), aceitar-convite, redefinir-senha
     (legal)/            → /privacidade, /termos
     api/                → rotas de API (todas autenticadas exceto /api/auth e /api/setup)
 
@@ -189,6 +189,7 @@ Controle de efetivo para ~500 colaboradores com turnos rotativos e fixos.
 | `EfetivoColaborador` | `efetivo_colaboradores` | Entidade principal; soft delete; vínculo com User opcional |
 | `EfetivoEvento` | `efetivo_eventos` | Override de escala: ausências, ajustes de ponto, trocas de turno |
 | `EfetivoSnapshot` + `EfetivoEscalaPublicada` | `efetivo_snapshots` + `efetivo_escala_publicada` | Escala mensal "congelada" para registro histórico |
+| `EfetivoAncoraHistorico` | `efetivo_ancora_historico` | Histórico de alterações de data-âncora com data de vigência |
 
 **`EfetivoTipoEvento` (enum):**
 ```
@@ -218,6 +219,21 @@ TROCA_TURNO_SAIDA | TROCA_TURNO_ENTRADA
 1. Itera eventos — se algum cobre `data` → retorna `ev.tipo` como status
 2. FIXO_SEMANAL: checa se dia da semana está em `diasSemana` (string "seg,ter,qua…")
 3. ROTATIVO: `ciclo = diasTrabalho + diasFolga`; `pos = ((diff % ciclo) + ciclo) % ciclo`; `pos < diasTrabalho` → TRABALHA
+
+**Histórico de âncora (`EfetivoAncoraHistorico`) — não-retroativo:**
+Colaboradores ROTATIVO podem ter a data-âncora alterada com uma `dataVigencia`.
+A função `resolveAncora(base, historico, d)` em `/api/efetivo/escala/route.ts` itera o histórico ordenado por `dataVigencia` ASC e retorna a âncora mais recente onde `dataVigencia <= d`. Dias anteriores à vigência continuam usando a âncora antiga automaticamente.
+
+```typescript
+// Histórico carregado uma vez por request, indexado por colaboradorId
+const ancoraMap = Map<colaboradorId, { dataAncora, dataVigencia }[]>
+// Escala usa: resolveAncora(c.dataAncora, ancoraMap.get(c.id) ?? [], d)
+```
+
+**Página `/efetivo/escala` — funcionalidades:**
+- Cabeçalho da tabela fixo (`sticky top-0 z-30`) com scroll vertical do grid
+- Exportação CSV com BOM UTF-8 e separador `;` (compatível com Excel Brasil)
+- Impressão via `@media print` em orientação paisagem (apenas `#escala-print-area`)
 
 **Datas UTC obrigatório:** campos `@db.Date` chegam como UTC midnight. Usar `getUTCDay()` e aritmética em ms. Nunca `getDay()` ou `toLocaleDateString()` sem timezone.
 
@@ -271,6 +287,15 @@ Campos disponíveis em `session.user`:
 - Redireciona autenticados de `/login` para `/dashboard`
 - Rotas públicas: `/`, `/login`, `/cadastro`, `/redefinir-senha`, `/aceitar-convite`, `/privacidade`, `/termos`, `/api/auth`, `/api/setup`
 
+### Bloqueio de cadastro público (desde 2026-06-20)
+Cadastros de novas empresas estão desativados. Três vetores bloqueados:
+- **`/api/auth/register`** → retorna 403 imediatamente
+- **`/cadastro`** → exibe aviso "Cadastros fechados — solicite convite ao admin"
+- **Google OAuth** → callback `signIn` bloqueia e-mails desconhecidos (não existem no banco) e redireciona para `/login?error=CadastroFechado`
+
+Único caminho de entrada: convite enviado pelo ADMIN da empresa (Fluxo 2 abaixo).
+Para reabrir cadastros: restaurar `POST /api/auth/register` e remover o bloco no `signIn` callback em `src/auth.ts`.
+
 ### Helpers de API (`src/lib/api.ts`)
 ```typescript
 withAuth(handler, minRole?)           // rotas simples
@@ -291,28 +316,33 @@ Nunca proteger apenas ocultando links no client.
 
 ### 1. Cadastro self-service
 ```
-POST /api/auth/register
-  → cria Company (FREE) + User (ADMIN) em $transaction
-  → registra aceite das versões legais ativas
-  → envia e-mail de boas-vindas
-  → signIn automático → /dashboard
+⛔ BLOQUEADO desde 2026-06-20
+POST /api/auth/register → 403 "Cadastros temporariamente fechados"
+Página /cadastro exibe aviso. Novos usuários entram apenas pelo Fluxo 2 (convite).
 ```
 
 ### 2. Convite de colaborador
 ```
 ADMIN → POST /api/usuarios/convite { email, role }
   → verifica limite do plano (planLimits.ts + companies.max_users)
-  → verifica se e-mail já é membro ou tem convite pendente
+  → verifica e-mail globalmente (não apenas na empresa):
+      mesmo companyId → "já é membro"
+      outro companyId → "vinculado a outra conta — contate suporte"
+  → verifica convite pendente não expirado
   → cria Invite (token hex 32, expira 48h)
   → envia e-mail com link /aceitar-convite?token=...
 
 Convidado → GET /aceitar-convite?token=...
   → valida token (existe, não aceito, não expirado)
-  → renderiza formulário com e-mail e nome da empresa pré-preenchidos
+  → renderiza AceitarConviteForm com e-mail e nome da empresa pré-preenchidos
 
 Convidado → POST /api/aceitar-convite { token, name, password, confirm }
-  → em $transaction: cria User + marca Invite.acceptedAt + registra aceite legal
-  → signIn("credentials") → /dashboard
+  → verifica e-mail globalmente antes de criar (evita unique constraint error)
+  → em $transaction: cria User + marca Invite.acceptedAt
+  → registra aceite legal
+  → tenta signIn("credentials") automático:
+      OK  → router.push("/dashboard") → LegalGate se houver termos pendentes
+      FAIL → router.push("/login?novo=1") → LoginForm exibe banner verde de sucesso
 ```
 
 ### 3. Limites de usuários por plano
@@ -395,7 +425,7 @@ ISO 9001:2015: template em produção, id=4, 13 seções, 72 campos
 | Rota | Método | Descrição |
 |---|---|---|
 | `/api/auth/[...nextauth]` | * | Auth.js handlers |
-| `/api/auth/register` | POST | Cadastro self-service |
+| `/api/auth/register` | POST | ⛔ Retorna 403 — cadastro público desativado |
 | `/api/auth/redefinir-senha` | POST | Solicitar reset |
 | `/api/auth/redefinir-senha/confirmar` | POST | Confirmar novo password |
 | `/api/aceitar-convite` | POST | Aceitar convite e criar conta |
@@ -483,6 +513,8 @@ ISO 9001:2015: template em produção, id=4, 13 seções, 72 campos
 | `/api/efetivo/cargos/[id]` | PATCH, DELETE | GESTOR | Editar / arquivar cargo |
 | `/api/efetivo/colaboradores` | GET, POST | GESTOR | Listar / criar colaborador |
 | `/api/efetivo/colaboradores/[matricula]` | GET, PATCH | GESTOR | Ficha + editar colaborador |
+| `/api/efetivo/colaboradores/[matricula]/ancora` | POST | GESTOR | Registrar alteração de data-âncora com vigência |
+| `/api/efetivo/colaboradores/[matricula]/ancora` | GET | GESTOR | Histórico de âncoras do colaborador |
 | `/api/efetivo/colaboradores/[matricula]/movimentacoes` | POST | GESTOR | Desligamento / readmissão |
 | `/api/efetivo/colaboradores/[matricula]/ocorrencias` | POST | GESTOR | Registrar ocorrência |
 | `/api/efetivo/ocorrencias/[id]` | DELETE | GESTOR | Remover ocorrência (soft) |
