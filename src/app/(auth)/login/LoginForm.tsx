@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Mail, Lock } from "lucide-react"
 
-export function LoginForm({ errorParam }: { errorParam?: string }) {
+export function LoginForm({ errorParam, novoCadastro }: { errorParam?: string; novoCadastro?: boolean }) {
   const router = useRouter()
   const [email, setEmail]       = useState("")
   const [password, setPassword] = useState("")
@@ -41,6 +41,12 @@ export function LoginForm({ errorParam }: { errorParam?: string }) {
         <div className="bg-white rounded-round border border-gray-200 p-8">
           <h1 className="text-xl font-semibold text-gray-900 mb-1">Entrar</h1>
           <p className="text-sm text-gray-500 mb-6">Acesse a sua conta bemoo.</p>
+
+          {novoCadastro && (
+            <div className="mb-4 text-xs text-green-800 bg-green-50 border border-green-200 rounded-soft px-3 py-2">
+              Conta criada com sucesso! Faça login para acessar a plataforma.
+            </div>
+          )}
 
           {errorParam === "CadastroFechado" && (
             <div className="mb-4 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-soft px-3 py-2">

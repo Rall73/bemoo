@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { signIn } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { BemooLogo } from "@/components/Logo"
 import { Button } from "@/components/ui/Button"
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export function AceitarConviteForm({ token, email, role, companyName }: Props) {
+  const router = useRouter()
   const [name,     setName]     = useState("")
   const [password, setPassword] = useState("")
   const [confirm,  setConfirm]  = useState("")
@@ -68,12 +70,14 @@ export function AceitarConviteForm({ token, email, role, companyName }: Props) {
         return
       }
 
-      // Aceito com sucesso — fazer login automático
+      // Aceito com sucesso — tentar login automático
       const login = await signIn("credentials", { email, password, redirect: false })
       if (login?.error) {
-        setGlobalError("Conta criada! Faça login para continuar.")
+        // Auto-login falhou — redirecionar para login com mensagem de sucesso
+        router.push("/login?novo=1")
       } else {
-        window.location.href = "/dashboard"
+        // Login OK — dashboard vai mostrar LegalGate se houver termos pendentes
+        router.push("/dashboard")
       }
     } catch {
       setGlobalError("Erro de conexão. Tente novamente.")
