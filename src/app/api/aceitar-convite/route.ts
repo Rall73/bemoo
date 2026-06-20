@@ -52,12 +52,20 @@ export async function POST(req: Request) {
   if (invite.acceptedAt) return badRequest("Este convite já foi utilizado. Faça login para acessar.")
   if (invite.expiresAt < new Date()) return badRequest("Este convite expirou. Solicite um novo ao administrador.")
 
-  // E-mail já cadastrado nesta empresa?
+  // E-mail já cadastrado (em qualquer empresa)?
   const emailEmUso = await prisma.user.findFirst({
-    where: { email: invite.email, companyId: invite.companyId, deletedAt: null },
-    select: { id: true },
+    where:  { email: invite.email, deletedAt: null },
+    select: { id: true, companyId: true },
   })
-  if (emailEmUso) return badRequest("Este e-mail já possui uma conta ativa na empresa.")
+  if (emailEmUso) {
+    if (emailEmUso.companyId === invite.companyId) {
+      return badRequest("Este e-mail já possui uma conta ativa na empresa. Faça login para acessar.")
+    }
+    return badRequest(
+      "Este e-mail já está vinculado a outra conta no bemoo. " +
+      "Entre em contato com o suporte para resolver."
+    )
+  }
 
   try {
     const hash = await bcrypt.hash(password, 12)

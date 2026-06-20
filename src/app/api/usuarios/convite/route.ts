@@ -39,13 +39,20 @@ export const POST = withAuth(async (req, session) => {
     }
   }
 
-  // E-mail já é membro ativo?
+  // E-mail já existe no sistema?
   const existingUser = await prisma.user.findFirst({
-    where:  { email, companyId, deletedAt: null },
-    select: { id: true },
+    where:  { email, deletedAt: null },
+    select: { id: true, companyId: true },
   })
   if (existingUser) {
-    return badRequest("Este e-mail já é membro da empresa.", { email: ["E-mail já cadastrado"] })
+    if (existingUser.companyId === companyId) {
+      return badRequest("Este e-mail já é membro da empresa.", { email: ["E-mail já cadastrado"] })
+    }
+    return badRequest(
+      "Este e-mail já possui uma conta no bemoo vinculada a outra empresa. " +
+      "Entre em contato com o suporte para resolver.",
+      { email: ["E-mail vinculado a outra conta"] }
+    )
   }
 
   // Já existe convite pendente não expirado?

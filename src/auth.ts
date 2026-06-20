@@ -44,6 +44,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
 
   callbacks: {
+    // Bloquear cadastros novos via Google enquanto registro público está fechado.
+    // Usuários já existentes no banco podem continuar usando Google normalmente.
+    async signIn({ account, profile }) {
+      if (account?.provider === "google" && profile?.email) {
+        const existing = await prisma.user.findUnique({
+          where:  { email: profile.email },
+          select: { id: true },
+        })
+        if (!existing) return "/login?error=CadastroFechado"
+      }
+      return true
+    },
+
     async jwt({ token, user, account, trigger, session: updateSession }) {
       // Atualização de sessão via useSession().update()
       if (trigger === "update" && updateSession?.mustChangePassword !== undefined) {
@@ -51,45 +64,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return token
       }
 
-      // Login com Google — buscar ou criar usuário no banco
+      // Login com Google — buscar usuário no banco (novos bloqueados pelo signIn callback)
       if (account?.provider === "google" && user?.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: user.email, deletedAt: null },
         })
 
         if (dbUser) {
-          // Usuário já existe → preencher token com dados do banco
           token.sub               = String(dbUser.id)
           token.role              = dbUser.role
           token.companyId         = dbUser.companyId
           token.platformAdmin     = dbUser.platformAdmin
           token.mustChangePassword = dbUser.mustChangePassword
-        } else {
-          // Novo usuário via Google → criar empresa + usuário
-          const nome = user.name ?? user.email.split("@")[0]
-
-          const newUser = await prisma.$transaction(async (tx) => {
-            const company = await tx.company.create({
-              data: { name: nome, email: user.email!, plan: "FREE" },
-            })
-            return tx.user.create({
-              data: {
-                companyId:     company.id,
-                name:          nome,
-                email:         user.email!,
-                password:      "", // sem senha — acesso só por Google
-                role:          "ADMIN",
-                platformAdmin: false,
-              },
-            })
-          })
-
-          token.sub               = String(newUser.id)
-          token.role              = newUser.role
-          token.companyId         = newUser.companyId
-          token.platformAdmin     = false
-          token.mustChangePassword = false
-          token.needsOnboarding   = true
         }
       } else if (user) {
         // Login por credenciais — dados já vêm do authorize()
