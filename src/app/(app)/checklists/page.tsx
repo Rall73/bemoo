@@ -12,8 +12,9 @@ export default async function ChecklistsPage() {
 
   const companyId = session.user.companyId as number
   const role      = session.user.role as string
+  const userId    = parseInt(session.user.id)
 
-  const [checklists, templates] = await Promise.all([
+  const [checklists, templates, myInProgress] = await Promise.all([
     prisma.checklist.findMany({
       where:   { companyId, isTemplate: false, deletedAt: null },
       include: {
@@ -27,10 +28,18 @@ export default async function ChecklistsPage() {
       include: { _count: { select: { items: { where: { deletedAt: null } } } } },
       orderBy: { name: "asc" },
     }),
+    prisma.checklistExecution.findMany({
+      where:  { companyId, executedBy: userId, status: "IN_PROGRESS", deletedAt: null },
+      select: { id: true, checklistId: true },
+    }),
   ])
 
   const canManage  = role === "ADMIN" || role === "GESTOR"
   const canExecute = role !== "AUDITOR"
+
+  // checklistId → executionId para o usuário atual
+  const userInProgress: Record<number, number> = {}
+  for (const ex of myInProgress) userInProgress[ex.checklistId] = ex.id
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -64,6 +73,7 @@ export default async function ChecklistsPage() {
         }))}
         canManage={canManage}
         canExecute={canExecute}
+        userInProgress={userInProgress}
       />
     </div>
   )

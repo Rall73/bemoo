@@ -22,10 +22,11 @@ export default async function ExecucoesPage() {
   if (!session?.user) redirect("/login")
 
   const companyId = session.user.companyId as number
+  const userId    = parseInt(session.user.id)
 
   const [inProgress, completed] = await Promise.all([
     prisma.checklistExecution.findMany({
-      where:   { companyId, deletedAt: null, status: "IN_PROGRESS" },
+      where:   { companyId, executedBy: userId, deletedAt: null, status: "IN_PROGRESS" },
       include: {
         checklist: { select: { name: true } },
         executor:  { select: { name: true } },

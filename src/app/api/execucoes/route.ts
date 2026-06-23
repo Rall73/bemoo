@@ -25,11 +25,20 @@ export const POST = withAuth(async (req, session) => {
   })
   if (!checklist) return forbidden("Checklist não disponível.")
 
+  const userId = parseInt(session.user.id)
+
+  // Retorna execução existente do mesmo usuário para este checklist
+  const existing = await prisma.checklistExecution.findFirst({
+    where: { checklistId: data.checklistId, companyId: session.user.companyId, executedBy: userId, status: "IN_PROGRESS", deletedAt: null },
+    select: { id: true },
+  })
+  if (existing) return created({ id: existing.id })
+
   const execution = await prisma.checklistExecution.create({
     data: {
       checklistId: data.checklistId,
       companyId:   session.user.companyId,
-      executedBy:  parseInt(session.user.id),
+      executedBy:  userId,
       status:      "IN_PROGRESS",
     },
   })

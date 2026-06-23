@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/Input"
 import {
   Plus, CheckSquare, ChevronRight, Pencil, Trash2,
   CircleCheck, CircleDot, Search, Play, Layers,
-  BookOpen, Download, ChevronDown, ChevronUp,
+  BookOpen, Download, ChevronDown, ChevronUp, RotateCcw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -35,9 +35,10 @@ interface Props {
   availableTemplates: Template[]
   canManage:          boolean
   canExecute:         boolean
+  userInProgress:     Record<number, number>  // checklistId → executionId
 }
 
-export function ChecklistsClient({ initialChecklists, availableTemplates, canManage, canExecute }: Props) {
+export function ChecklistsClient({ initialChecklists, availableTemplates, canManage, canExecute, userInProgress }: Props) {
   const router = useRouter()
 
   const [checklists,  setChecklists]  = useState(initialChecklists)
@@ -305,78 +306,96 @@ export function ChecklistsClient({ initialChecklists, availableTemplates, canMan
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map((c) => (
-              <div
-                key={c.id}
-                className="bg-white border border-gray-200 rounded-round p-4 flex items-center gap-4 hover:border-gray-300 transition-colors group"
-              >
-                <div className={cn(
-                  "w-9 h-9 rounded-soft flex items-center justify-center flex-shrink-0",
-                  c.active ? "bg-primary-50" : "bg-gray-50"
-                )}>
-                  {c.active
-                    ? <CircleCheck size={18} className="text-primary" strokeWidth={2} />
-                    : <CircleDot   size={18} className="text-gray-400" strokeWidth={2} />
-                  }
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
-                    {!c.active && (
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
-                        Inativo
-                      </span>
-                    )}
+            {filtered.map((c) => {
+              const myExecId = userInProgress[c.id]
+              return (
+                <div
+                  key={c.id}
+                  className="bg-white border border-gray-200 rounded-round p-4 flex items-center gap-4 hover:border-gray-300 transition-colors group"
+                >
+                  <div className={cn(
+                    "w-9 h-9 rounded-soft flex items-center justify-center flex-shrink-0",
+                    c.active ? "bg-primary-50" : "bg-gray-50"
+                  )}>
+                    {c.active
+                      ? <CircleCheck size={18} className="text-primary" strokeWidth={2} />
+                      : <CircleDot   size={18} className="text-gray-400" strokeWidth={2} />
+                    }
                   </div>
-                  {c.description && (
-                    <p className="text-xs text-gray-500 truncate mt-0.5">{c.description}</p>
-                  )}
-                  <p className="text-[11px] text-gray-400 mt-0.5">
-                    {c.itemCount} {c.itemCount === 1 ? "item" : "itens"} · Criado por {c.createdBy}
-                  </p>
-                </div>
 
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {canExecute && c.active && (
-                    <button
-                      onClick={() => handleExecutar(c.id)}
-                      disabled={startingId === c.id}
-                      title="Executar"
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-soft text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-60"
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
+                      {!c.active && (
+                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
+                          Inativo
+                        </span>
+                      )}
+                      {myExecId && (
+                        <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded flex-shrink-0">
+                          Em andamento
+                        </span>
+                      )}
+                    </div>
+                    {c.description && (
+                      <p className="text-xs text-gray-500 truncate mt-0.5">{c.description}</p>
+                    )}
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      {c.itemCount} {c.itemCount === 1 ? "item" : "itens"} · Criado por {c.createdBy}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {canExecute && c.active && (
+                      myExecId ? (
+                        <Link
+                          href={`/execucoes/${myExecId}`}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-soft text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                        >
+                          <RotateCcw size={12} strokeWidth={2.5} />
+                          Continuar
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => handleExecutar(c.id)}
+                          disabled={startingId === c.id}
+                          title="Executar"
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-soft text-xs font-medium bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-60"
+                        >
+                          <Play size={12} strokeWidth={2.5} />
+                          {startingId === c.id ? "..." : "Executar"}
+                        </button>
+                      )
+                    )}
+                    {canManage && (
+                      <>
+                        <Link
+                          href={`/checklists/${c.id}`}
+                          className="p-1.5 rounded-soft text-gray-400 hover:text-primary hover:bg-primary-50 transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil size={15} strokeWidth={2} />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(c.id)}
+                          disabled={deleting === c.id}
+                          className="p-1.5 rounded-soft text-gray-400 hover:text-error hover:bg-red-50 transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 size={15} strokeWidth={2} />
+                        </button>
+                      </>
+                    )}
+                    <Link
+                      href={`/checklists/${c.id}`}
+                      className="p-1.5 rounded-soft text-gray-300 group-hover:text-gray-500 transition-colors"
                     >
-                      <Play size={12} strokeWidth={2.5} />
-                      {startingId === c.id ? "..." : "Executar"}
-                    </button>
-                  )}
-                  {canManage && (
-                    <>
-                      <Link
-                        href={`/checklists/${c.id}`}
-                        className="p-1.5 rounded-soft text-gray-400 hover:text-primary hover:bg-primary-50 transition-colors"
-                        title="Editar"
-                      >
-                        <Pencil size={15} strokeWidth={2} />
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(c.id)}
-                        disabled={deleting === c.id}
-                        className="p-1.5 rounded-soft text-gray-400 hover:text-error hover:bg-red-50 transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 size={15} strokeWidth={2} />
-                      </button>
-                    </>
-                  )}
-                  <Link
-                    href={`/checklists/${c.id}`}
-                    className="p-1.5 rounded-soft text-gray-300 group-hover:text-gray-500 transition-colors"
-                  >
-                    <ChevronRight size={16} strokeWidth={2} />
-                  </Link>
+                      <ChevronRight size={16} strokeWidth={2} />
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
